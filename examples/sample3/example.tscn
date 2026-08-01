@@ -40,12 +40,16 @@ event = &"next_round"
 script = ExtResource("3_kb0mp")
 transitions = Array[ExtResource("4_wqi00")]([SubResource("Resource_jdqt4"), SubResource("Resource_ydgej"), SubResource("Resource_570h2"), SubResource("Resource_lxjei")])
 editor_positions = {
-&"state_217ff1bf897ae801": Vector2(1134.0997, 210.70174),
-&"state_26a92f3194c32c09": Vector2(1595.2867, 393.37354),
-&"state_30933b671d07d9b5": Vector2(599, 124)
+&"state_217ff1bf897ae801": Vector2(1121.2382, 116.38379),
+&"state_26a92f3194c32c09": Vector2(1240.8688, 466.8223),
+&"state_30933b671d07d9b5": Vector2(399.64615, 203.31282),
+&"transition:transition_4f41d4bfda41a2cd": Vector2(1440, 180),
+&"transition:transition_635c98c3fc8e9c4f": Vector2(1394.6932, 344.53763),
+&"transition:transition_6e9ca322a9caa76c": Vector2(740, 460),
+&"transition:transition_7670bd50e7c755f4": Vector2(800, 120)
 }
-editor_scroll = Vector2(1032.8188, 274.80786)
-editor_zoom = 0.9090907
+editor_scroll = Vector2(-9.901245, 31.258331)
+editor_zoom = 0.51315784
 
 [node name="Example" type="Node2D" unique_id=1287871559]
 script = ExtResource("1_xmsfn")

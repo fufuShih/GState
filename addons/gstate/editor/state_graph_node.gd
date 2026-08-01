@@ -13,6 +13,11 @@ const COLUMN_GAP := 24
 const PORT_ROW_HEIGHT := 22.0
 const DRAG_THRESHOLD := 6.0
 const FALLBACK_TITLEBAR_HEIGHT := 32.0
+const STATE_PANEL_TINT := Color(0.10, 0.22, 0.34)
+const STATE_TITLE_TINT := Color(0.12, 0.34, 0.54)
+const STATE_SELECTED_BORDER := Color(0.42, 0.72, 1.0)
+const PANEL_TINT_STRENGTH := 0.22
+const TITLE_TINT_STRENGTH := 0.42
 
 var state: State
 var _outgoing_transitions: Array[StateTransition] = []
@@ -21,6 +26,10 @@ var _drag_candidate: bool = false
 var _dragging: bool = false
 var _press_global_position: Vector2
 var _position_before_drag: Vector2
+
+
+func _ready() -> void:
+	_apply_state_style()
 
 
 func setup(
@@ -65,6 +74,48 @@ func setup(
 				OUT_PORT_COLOR
 		)
 	gui_input.connect(_on_gui_input)
+
+
+func _apply_state_style() -> void:
+	_override_state_style(
+			&"panel",
+			STATE_PANEL_TINT,
+			PANEL_TINT_STRENGTH
+	)
+	_override_state_style(
+			&"titlebar",
+			STATE_TITLE_TINT,
+			TITLE_TINT_STRENGTH
+	)
+	_override_state_style(
+			&"panel_selected",
+			STATE_PANEL_TINT,
+			PANEL_TINT_STRENGTH + 0.08,
+			true
+	)
+	_override_state_style(
+			&"titlebar_selected",
+			STATE_TITLE_TINT,
+			TITLE_TINT_STRENGTH + 0.08,
+			true
+	)
+
+
+func _override_state_style(
+		theme_name: StringName,
+		tint: Color,
+		strength: float,
+		selected_style: bool = false
+) -> void:
+	var source := get_theme_stylebox(theme_name)
+	if not source is StyleBoxFlat:
+		return
+	var style := source.duplicate() as StyleBoxFlat
+	style.bg_color = style.bg_color.lerp(tint, strength)
+	if selected_style:
+		style.border_color = STATE_SELECTED_BORDER
+		style.set_border_width_all(2)
+	add_theme_stylebox_override(theme_name, style)
 
 
 func get_transition_output_port(transition: StateTransition) -> int:

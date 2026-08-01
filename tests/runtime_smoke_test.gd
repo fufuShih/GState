@@ -185,6 +185,18 @@ func _run() -> void:
 		and dead_graph_node.get_input_port_count() == 2,
 		"State nodes expose numbered incoming transition ports"
 	)
+	_expect(
+		grounded_graph_node != null
+		and grounded_graph_node.has_theme_stylebox_override(&"panel")
+		and grounded_graph_node.has_theme_stylebox_override(&"titlebar")
+		and grounded_graph_node.has_theme_stylebox_override(
+				&"panel_selected"
+		)
+		and grounded_graph_node.has_theme_stylebox_override(
+				&"titlebar_selected"
+		),
+		"State nodes provide normal and selected color overrides"
+	)
 	var jump_transition_node := _find_transition_graph_node(
 			graph_view,
 			&"jump"
@@ -198,6 +210,12 @@ func _run() -> void:
 		and jump_transition_node.get_input_port_count() == 1
 		and jump_transition_node.get_output_port_count() == 1,
 		"Transition nodes expose one input and one output port"
+	)
+	_expect(
+		jump_transition_node != null
+		and not jump_transition_node.has_theme_stylebox_override(&"panel")
+		and not jump_transition_node.has_theme_stylebox_override(&"titlebar"),
+		"Transition nodes keep the default editor colors"
 	)
 	_expect(
 		jump_transition_node != null
