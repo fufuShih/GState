@@ -1,0 +1,68 @@
+name: Release GState
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Package and publish
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out tagged source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify the tag is on main
+        shell: bash
+        run: |
+          git fetch origin main
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" FETCH_HEAD; then
+            echo "::error::Release tags must point to a commit on main."
+            exit 1
+          fi
+
+      - name: Verify the addon version
+        shell: bash
+        run: |
+          tag_version="${GITHUB_REF_NAME#v}"
+          plugin_version="$(sed -n 's/^version="\([^"]*\)".*/\1/p' addons/gstate/plugin.cfg)"
+
+          if [[ -z "$plugin_version" ]]; then
+            echo "::error::Could not read the version from addons/gstate/plugin.cfg."
+            exit 1
+          fi
+
+          if [[ "$tag_version" != "$plugin_version" ]]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match plugin version $plugin_version."
+            exit 1
+          fi
+
+      - name: Package the addon
+        id: package
+        shell: bash
+        run: |
+          asset_name="gstate-${GITHUB_REF_NAME}.zip"
+          git archive --format=zip --output="$asset_name" "$GITHUB_SHA" addons/gstate
+
+          unzip -Z1 "$asset_name" | grep -qx "addons/gstate/plugin.cfg"
+          echo "asset_name=$asset_name" >> "$GITHUB_OUTPUT"
+
+      - name: Publish the GitHub Release
+        env:
+          GH_TOKEN: "${{ github.token }}"
+        shell: bash
+        run: >-
+          gh release create
+          "$GITHUB_REF_NAME"
+          "${{ steps.package.outputs.asset_name }}"
+          --repo "$GITHUB_REPOSITORY"
+          --verify-tag
+          --generate-notes
+          --title "GState $GITHUB_REF_NAME"
