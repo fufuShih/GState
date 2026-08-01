@@ -1,5 +1,7 @@
 # GState 文件
 
+[English](../en/README.md) | 繁體中文
+
 GState 是 Godot 的階層式、事件驅動狀態機插件。狀態階層由 Scene Tree
 管理，Transition 與 Graph Editor 資料則儲存在 `StateMachineGraph`。
 
@@ -20,6 +22,7 @@ GState 是 Godot 的階層式、事件驅動狀態機插件。狀態階層由 Sc
 - 事件由最深層往父層搜尋
 - Compound State 的 Initial Child
 - 子 Scope 顯示父層可用的 Exit events
+- 同一台 Machine 內共用的 typed `StateContext` Resource
 - `enter()`、`exit()`、`update()` 與 `physics_update()`
 - Graph Editor 與 Undo/Redo
 

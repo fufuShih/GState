@@ -1,6 +1,7 @@
 # GState
 
-完整文件請參考專案根目錄的 [`docs/`](../../docs/README.md)。
+See the [English documentation](../../docs/en/README.md) or
+[Traditional Chinese documentation](../../docs/zh-TW/README.md).
 
 Graph nodes use separate, color-coded `IN` and `OUT` columns. Each transition
 occupies its own taller row and shows only its event name; the connection itself

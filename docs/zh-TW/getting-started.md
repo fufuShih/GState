@@ -1,5 +1,7 @@
 # Node2D 快速入門
 
+[文件索引](README.md) | [English](../en/getting-started.md)
+
 ## 1. 啟用插件
 
 在 Godot 開啟：

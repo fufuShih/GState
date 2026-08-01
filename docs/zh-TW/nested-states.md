@@ -1,5 +1,7 @@
 # Nested State
 
+[文件索引](README.md) | [English](../en/nested-states.md)
+
 State 底下包含其他 State 時，它就是 Compound State：
 
 ```text

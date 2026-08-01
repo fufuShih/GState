@@ -1,5 +1,7 @@
 # 架構
 
+[文件索引](README.md) | [English](../en/architecture.md)
+
 GState 使用三層 Node：
 
 ```text

@@ -1,5 +1,7 @@
 # Runtime API
 
+[Documentation index](README.md) | [Traditional Chinese](../zh-TW/runtime-api.md)
+
 ## StateManager
 
 ```gdscript
@@ -13,17 +15,17 @@ var movement := state_manager.get_machine(&"Movement")
 state_manager.send_to(&"Movement", &"move")
 ```
 
-StateManager 管理直接子節點中的 StateMachine。Machine 之間彼此獨立。
-Manager 的 `actor` 沒有設定時預設使用自己的父 Node；個別 StateMachine
-有設定 actor 時則優先使用自己的設定。
+`StateManager` manages direct `StateMachine` children. Each machine is
+independent. When the manager has no explicit `actor`, it uses its parent Node.
+An actor assigned directly to a StateMachine takes precedence.
 
-- Manager 自動啟動時，只啟動 `autostart` 開啟的 Machine。
-- 明確呼叫 `state_manager.start()` 時，啟動所有 active Machine。
-- 仍可直接呼叫某一台 Machine 的 `start()` 或 `stop()`。
+- Manager autostart only starts machines with `autostart` enabled.
+- Calling `state_manager.start()` explicitly starts every active machine.
+- A machine can still be started or stopped directly.
 
 ## StateMachine
 
-### 控制
+### Control
 
 ```gdscript
 state_machine.start()
@@ -31,10 +33,11 @@ state_machine.restart()
 state_machine.stop()
 ```
 
-`start()` 與 `restart()` 回傳 `bool`。啟動前會執行驗證；存在嚴重錯誤時
-不會進入任何狀態。
+`start()` and `restart()` return `bool`. The machine validates its complete
+configuration before starting and does not enter any state when validation
+contains errors.
 
-### 事件與切換
+### Events and transitions
 
 ```gdscript
 state_machine.send(&"move")
@@ -43,14 +46,14 @@ state_machine.travel("Grounded/Run")
 state_machine.travel($StateManager/Movement/Grounded/Run)
 ```
 
-- `send()` 根據目前 Active Path 搜尋 Event Transition。
-- `payload` 只在本次切換中傳給 `enter()` 與 Signal。
-- `travel()` 不需要 Transition，會直接前往 State 或 State Path。
-- 進入 Compound State 時會自動展開 Initial Child。
+- `send()` searches the current active path for an event transition.
+- `payload` is passed to `enter()` and signals for that transition.
+- `travel()` moves directly to a State or state path without a transition.
+- Entering a compound state automatically follows its initial children.
 
 ### Context
 
-Context 使用自訂 `StateContext` Resource。先為遊戲資料建立有型別的類別：
+Context uses a custom typed `StateContext` Resource:
 
 ```gdscript
 class_name MovementContext
@@ -60,28 +63,27 @@ extends StateContext
 @export var direction: Vector2 = Vector2.ZERO
 ```
 
-在 StateMachine 的 Inspector 中，將 `initial_context` 設為
-`MovementContext`。State script 取得後即可直接讀寫：
+Assign a `MovementContext` Resource to `initial_context` in the StateMachine
+Inspector. A State can then read and write the runtime context directly:
 
 ```gdscript
 extends State
 
 
-func enter(_previous_state: State, payload: Variant = null) -> void:
+func enter(_previous_state: State, _payload: Variant = null) -> void:
 	var context := get_context() as MovementContext
 	context.speed = 240.0
 	context.direction = Vector2.RIGHT
 ```
 
-- 同一個 StateMachine 的所有 State 取得同一個 runtime Resource。
-- 從 stopped 狀態成功 `start()` 或呼叫 `restart()` 時，StateMachine
-  會複製 `initial_context`，不會修改 Inspector 中的初始 Resource。
-- 不需要 context 時可讓 `initial_context` 保持空白，`get_context()`
-  會回傳 `null`。
-- `reset_context()` 可在執行中明確建立一份新的初始 context。
-- 不同 StateMachine 的 runtime context 彼此隔離。
+- Every State in one StateMachine receives the same runtime Resource.
+- Starting a stopped machine or calling `restart()` duplicates
+  `initial_context`, leaving the Inspector Resource unchanged.
+- When `initial_context` is empty, `get_context()` returns `null`.
+- `reset_context()` explicitly creates a fresh runtime copy.
+- Runtime contexts are isolated between StateMachines.
 
-### 查詢
+### Queries
 
 ```gdscript
 var current: State = state_machine.get_current_state()
@@ -93,10 +95,10 @@ state_machine.is_in_state("Grounded/Run")
 state_machine.is_in_state($StateManager/Movement/Grounded)
 ```
 
-`get_current_state()` 回傳 Active Path 最深層的 State。沒有 Active State
-時回傳 `null`。
+`get_current_state()` returns the deepest State in the active path. It returns
+`null` when the machine has no active State.
 
-### 驗證
+### Validation
 
 ```gdscript
 var result: Dictionary = state_machine.validate()
@@ -106,7 +108,7 @@ var warnings: PackedStringArray = result["warnings"]
 
 ## State lifecycle
 
-State 腳本可以覆寫：
+A State script can override any lifecycle hook:
 
 ```gdscript
 extends State
@@ -128,15 +130,15 @@ func physics_update(delta: float) -> void:
 	pass
 ```
 
-呼叫順序：
+Lifecycle order:
 
 ```text
-Enter／Update／Physics → 父到子
-Exit                   → 子到父
+Enter / Update / Physics → parent to child
+Exit                     → child to parent
 ```
 
-State 不需要自行啟用 `_process()`；只有 Active Path 上的 State 會由
-StateMachine 驅動。
+States do not need to enable `_process()` themselves. The StateMachine drives
+only States on the active path.
 
 ## Signals
 
@@ -150,7 +152,7 @@ state_machine.state_exited.connect(_on_state_exited)
 state_machine.active_path_changed.connect(_on_active_path_changed)
 ```
 
-需要顯示完整 Nested Path 時，建議使用 `active_path_changed`：
+Use `active_path_changed` when displaying a complete nested path:
 
 ```gdscript
 func _on_active_path_changed(path: Array[State]) -> void:
