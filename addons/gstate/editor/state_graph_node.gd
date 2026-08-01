@@ -10,7 +10,7 @@ signal position_drag_finished
 const IN_PORT_COLOR := Color(0.38, 0.64, 0.95)
 const OUT_PORT_COLOR := Color(0.35, 0.82, 0.65)
 const COLUMN_GAP := 24
-const PORT_ROW_HEIGHT := 34.0
+const PORT_ROW_HEIGHT := 22.0
 const DRAG_THRESHOLD := 6.0
 const FALLBACK_TITLEBAR_HEIGHT := 32.0
 
@@ -37,7 +37,7 @@ func setup(
 	draggable = false
 	resizable = false
 	selectable = true
-	custom_minimum_size = Vector2(380.0, 0.0)
+	custom_minimum_size = Vector2(230.0, 0.0)
 	title = ("%s  %s" % ["●" if is_initial else "", state.name]).strip_edges()
 	tooltip_text = _build_tooltip(is_initial)
 
@@ -47,23 +47,16 @@ func setup(
 	kind_label.modulate = Color(0.72, 0.75, 0.8)
 	add_child(kind_label)
 
-	var column_header := _create_column_header()
-	add_child(column_header)
+	add_child(_create_port_header())
 
-	var port_row_count: int = maxi(
+	var port_row_count := maxi(
 			1,
 			maxi(incoming.size(), outgoing.size())
 	)
 	for port_index: int in range(port_row_count):
-		var port_row := _create_port_row(
-				port_index,
-				incoming,
-				outgoing
-		)
-		add_child(port_row)
-		var slot_index: int = port_index + 2
+		add_child(_create_port_row(port_index, incoming, outgoing))
 		set_slot(
-				slot_index,
+				port_index + 2,
 				port_index < maxi(1, incoming.size()),
 				0,
 				IN_PORT_COLOR,
@@ -75,34 +68,21 @@ func setup(
 
 
 func get_transition_output_port(transition: StateTransition) -> int:
-	var index: int = _outgoing_transitions.find(transition)
+	var index := _outgoing_transitions.find(transition)
 	return index if index >= 0 else 0
 
 
 func get_transition_input_port(transition: StateTransition) -> int:
-	var index: int = _incoming_transitions.find(transition)
+	var index := _incoming_transitions.find(transition)
 	return index if index >= 0 else 0
 
 
-func _create_column_header() -> Control:
+func _create_port_header() -> Control:
 	var row := HBoxContainer.new()
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_theme_constant_override(&"separation", COLUMN_GAP)
-
-	var input_header := Label.new()
-	input_header.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	input_header.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	input_header.text = "IN"
-	input_header.modulate = IN_PORT_COLOR
-	row.add_child(input_header)
-
-	var output_header := Label.new()
-	output_header.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	output_header.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	output_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	output_header.text = "OUT"
-	output_header.modulate = OUT_PORT_COLOR
-	row.add_child(output_header)
+	row.add_child(_create_port_label("IN", IN_PORT_COLOR, false))
+	row.add_child(_create_port_label("OUT", OUT_PORT_COLOR, true))
 	return row
 
 
@@ -116,41 +96,34 @@ func _create_port_row(
 	row.custom_minimum_size = Vector2(0.0, PORT_ROW_HEIGHT)
 	row.add_theme_constant_override(&"separation", COLUMN_GAP)
 
-	var input_label := Label.new()
-	input_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	input_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	input_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	input_label.tooltip_text = _get_transition_event_text(index, incoming)
-	input_label.text = input_label.tooltip_text
-	input_label.modulate = IN_PORT_COLOR
-	if index >= incoming.size():
-		input_label.text = "Drop IN" if index == 0 else ""
-		input_label.modulate = Color(0.48, 0.56, 0.67)
-	row.add_child(input_label)
-
-	var output_label := Label.new()
-	output_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	output_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	output_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	output_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	output_label.tooltip_text = _get_transition_event_text(index, outgoing)
-	output_label.text = output_label.tooltip_text
-	output_label.modulate = OUT_PORT_COLOR
-	if index >= outgoing.size():
-		output_label.text = "Drag OUT" if index == 0 else ""
-		output_label.modulate = Color(0.46, 0.62, 0.55)
-	row.add_child(output_label)
+	var input_text := (
+			str(index) if index < maxi(1, incoming.size()) else ""
+	)
+	var output_text := (
+			str(index) if index < maxi(1, outgoing.size()) else ""
+	)
+	row.add_child(_create_port_label(input_text, IN_PORT_COLOR, false))
+	row.add_child(_create_port_label(output_text, OUT_PORT_COLOR, true))
 	return row
 
 
-func _get_transition_event_text(
-		index: int,
-		transitions: Array[StateTransition]
-) -> String:
-	if index < transitions.size():
-		var event_name := str(transitions[index].event)
-		return event_name if not event_name.is_empty() else "(empty event)"
-	return ""
+func _create_port_label(
+		text: String,
+		color: Color,
+		align_right: bool
+) -> Label:
+	var label := Label.new()
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	label.horizontal_alignment = (
+			HORIZONTAL_ALIGNMENT_RIGHT
+			if align_right
+			else HORIZONTAL_ALIGNMENT_LEFT
+	)
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label.text = text
+	label.modulate = color
+	return label
 
 
 func _get_kind_text(is_initial: bool) -> String:

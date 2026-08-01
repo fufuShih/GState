@@ -41,10 +41,11 @@ script = ExtResource("3_kb0mp")
 transitions = Array[ExtResource("4_wqi00")]([SubResource("Resource_jdqt4"), SubResource("Resource_ydgej"), SubResource("Resource_570h2"), SubResource("Resource_lxjei")])
 editor_positions = {
 &"state_217ff1bf897ae801": Vector2(1134.0997, 210.70174),
-&"state_26a92f3194c32c09": Vector2(1609.5868, 329.57352),
+&"state_26a92f3194c32c09": Vector2(1595.2867, 393.37354),
 &"state_30933b671d07d9b5": Vector2(599, 124)
 }
-editor_zoom = 0.38554317
+editor_scroll = Vector2(1032.8188, 274.80786)
+editor_zoom = 0.9090907
 
 [node name="Example" type="Node2D" unique_id=1287871559]
 script = ExtResource("1_xmsfn")

@@ -166,20 +166,61 @@ func _run() -> void:
 		"root graph view displays direct child states"
 	)
 	_expect(
-		_get_graph_edit(graph_view).connections.size() == 4,
-		"root graph view displays scoped transitions"
+		_count_transition_graph_nodes(graph_view) == 4,
+		"root graph view displays one node per scoped transition"
+	)
+	_expect(
+		_get_graph_edit(graph_view).connections.size() == 8,
+		"each root transition is displayed with two connections"
 	)
 	var grounded_graph_node := _find_graph_node(graph_view, grounded)
 	var dead_graph_node := _find_graph_node(graph_view, dead)
 	_expect(
 		grounded_graph_node != null
 		and grounded_graph_node.get_output_port_count() == 2,
-		"each outgoing transition receives a distinct output port"
+		"State nodes expose numbered outgoing transition ports"
 	)
 	_expect(
 		dead_graph_node != null
 		and dead_graph_node.get_input_port_count() == 2,
-		"each incoming transition receives a distinct input port"
+		"State nodes expose numbered incoming transition ports"
+	)
+	var jump_transition_node := _find_transition_graph_node(
+			graph_view,
+			&"jump"
+	)
+	var land_transition_node := _find_transition_graph_node(
+			graph_view,
+			&"land"
+	)
+	_expect(
+		jump_transition_node != null
+		and jump_transition_node.get_input_port_count() == 1
+		and jump_transition_node.get_output_port_count() == 1,
+		"Transition nodes expose one input and one output port"
+	)
+	_expect(
+		jump_transition_node != null
+		and jump_transition_node.title == "Transition →"
+		and (jump_transition_node.get_child(0) as Label).text == "jump",
+		"Transition nodes use a fixed title and show the event in the body"
+	)
+	var grounded_second_port_row: HBoxContainer
+	if grounded_graph_node != null and grounded_graph_node.get_child_count() > 3:
+		grounded_second_port_row = (
+				grounded_graph_node.get_child(3) as HBoxContainer
+		)
+	_expect(
+		grounded_second_port_row != null
+		and (grounded_second_port_row.get_child(1) as Label).text == "1",
+		"State port rows display indexes without event names"
+	)
+	_expect(
+		jump_transition_node != null
+		and land_transition_node != null
+		and jump_transition_node.position_offset
+		!= land_transition_node.position_offset,
+		"opposite transitions receive distinct default positions"
 	)
 	graph_view._show_scope(grounded)
 	_expect(
@@ -187,8 +228,12 @@ func _run() -> void:
 		"nested graph view displays direct child states"
 	)
 	_expect(
-		_get_graph_edit(graph_view).connections.size() == 2,
-		"nested graph displays scoped transitions"
+		_count_transition_graph_nodes(graph_view) == 2,
+		"nested graph displays scoped transition nodes"
+	)
+	_expect(
+		_get_graph_edit(graph_view).connections.size() == 4,
+		"nested transitions are displayed with two connections each"
 	)
 	graph_view.queue_free()
 
@@ -287,6 +332,14 @@ func _count_graph_nodes(editor: GStateMachineEditor) -> int:
 	return count
 
 
+func _count_transition_graph_nodes(editor: GStateMachineEditor) -> int:
+	var count := 0
+	for child: Node in _get_graph_edit(editor).get_children():
+		if child is GStateTransitionGraphNode:
+			count += 1
+	return count
+
+
 func _find_graph_node(
 		editor: GStateMachineEditor,
 		state: State
@@ -294,6 +347,19 @@ func _find_graph_node(
 	for child: Node in _get_graph_edit(editor).get_children():
 		if child is GStateGraphNode and (child as GStateGraphNode).state == state:
 			return child as GStateGraphNode
+	return null
+
+
+func _find_transition_graph_node(
+		editor: GStateMachineEditor,
+		event: StringName
+) -> GStateTransitionGraphNode:
+	for child: Node in _get_graph_edit(editor).get_children():
+		if (
+			child is GStateTransitionGraphNode
+			and (child as GStateTransitionGraphNode).transition.event == event
+		):
+			return child as GStateTransitionGraphNode
 	return null
 
 

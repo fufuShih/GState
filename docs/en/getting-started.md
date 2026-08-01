@@ -62,6 +62,10 @@ Disabled --enable--> Enabled
 Drag from the green `OUT` port on the right to the blue `IN` port on the left,
 then enter the event name.
 
+The editor displays the result as `State -> [event] -> State`. Drag the small
+event node to adjust the layout, double-click it to edit the event, or select it
+and press `Delete` to remove the transition.
+
 When you enter a child scope, the summary above the graph displays exit events
 available from the parent scope. Leaving a nested state does not require a
 special node. Return to the parent scope and create a transition from the

@@ -4,6 +4,8 @@ extends Resource
 
 ## Runtime transition data plus editor metadata reserved for the GraphEdit phase.
 
+const TRANSITION_POSITION_PREFIX := "transition:"
+
 @export var transitions: Array[StateTransition] = []
 @export_storage var editor_positions: Dictionary = {}
 @export_storage var editor_scroll: Vector2 = Vector2.ZERO
@@ -90,7 +92,57 @@ func remove_state_position(state_or_id: Variant) -> bool:
 	return true
 
 
+func set_transition_position(
+		transition_or_id: Variant,
+		position: Vector2
+) -> void:
+	var key := get_transition_position_key(transition_or_id)
+	if key.is_empty():
+		return
+	editor_positions[key] = position
+	emit_changed()
+
+
+func get_transition_position(
+		transition_or_id: Variant,
+		default_position: Vector2 = Vector2.ZERO
+) -> Vector2:
+	var key := get_transition_position_key(transition_or_id)
+	var stored_position: Variant = editor_positions.get(key, default_position)
+	if stored_position is Vector2:
+		return stored_position
+	return default_position
+
+
+func has_transition_position(transition_or_id: Variant) -> bool:
+	var key := get_transition_position_key(transition_or_id)
+	return not key.is_empty() and editor_positions.has(key)
+
+
+func remove_transition_position(transition_or_id: Variant) -> bool:
+	var key := get_transition_position_key(transition_or_id)
+	if key.is_empty() or not editor_positions.erase(key):
+		return false
+	emit_changed()
+	return true
+
+
+static func get_transition_position_key(
+		transition_or_id: Variant
+) -> StringName:
+	var transition_id := _get_transition_id(transition_or_id)
+	if transition_id.is_empty():
+		return &""
+	return StringName(TRANSITION_POSITION_PREFIX + str(transition_id))
+
+
 static func _get_state_id(state_or_id: Variant) -> StringName:
 	if state_or_id is State:
 		return (state_or_id as State).stable_id
 	return StringName(str(state_or_id))
+
+
+static func _get_transition_id(transition_or_id: Variant) -> StringName:
+	if transition_or_id is StateTransition:
+		return (transition_or_id as StateTransition).id
+	return StringName(str(transition_or_id))

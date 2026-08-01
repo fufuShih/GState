@@ -7,9 +7,15 @@ extends Control
 const StateGraphNodeScript := preload(
 		"res://addons/gstate/editor/state_graph_node.gd"
 )
+const TransitionGraphNodeScript := preload(
+		"res://addons/gstate/editor/transition_graph_node.gd"
+)
 const FALLBACK_ORIGIN := Vector2(80.0, 70.0)
-const FALLBACK_SPACING := Vector2(270.0, 170.0)
+const FALLBACK_SPACING := Vector2(460.0, 190.0)
 const FALLBACK_COLUMNS := 3
+const TRANSITION_NODE_SIZE := Vector2(170.0, 60.0)
+const PARALLEL_TRANSITION_SPACING := 64.0
+const SELF_TRANSITION_OFFSET := Vector2(270.0, -20.0)
 
 @onready var _breadcrumb: HBoxContainer = %Breadcrumb
 @onready var _machine_row: HBoxContainer = %MachineRow
@@ -43,6 +49,7 @@ var _state_manager: StateManager
 var _state_machine: StateMachine
 var _scope: State
 var _selected_state: State
+var _selected_transition: StateTransition
 var _pending_from_state: State
 var _pending_to_state: State
 var _editing_transition: StateTransition
@@ -52,6 +59,8 @@ var _editor_interface: EditorInterface
 var _node_names_by_state_id: Dictionary[StringName, StringName] = {}
 var _states_by_node_name: Dictionary[StringName, State] = {}
 var _graph_nodes_by_state_id: Dictionary[StringName, GStateGraphNode] = {}
+var _transitions_by_node_name: Dictionary[StringName, StateTransition] = {}
+var _graph_nodes_by_transition_id: Dictionary[StringName, GStateTransitionGraphNode] = {}
 var _positions_before_move: Dictionary = {}
 var _observed_scene_nodes: Array[Node] = []
 var _refreshing: bool = false
@@ -135,6 +144,7 @@ func _change_state_machine(machine: StateMachine) -> void:
 	_state_machine = machine
 	_scope = null
 	_selected_state = null
+	_selected_transition = null
 	_connect_graph_resource()
 	_rebuild_machine_selector()
 	refresh()
@@ -149,6 +159,7 @@ func edit_state(machine: StateMachine, state: State) -> void:
 		return
 	_scope = state.get_parent() as State
 	_selected_state = state
+	_selected_transition = null
 	refresh()
 
 
@@ -199,6 +210,8 @@ func refresh() -> void:
 	var state_names: Dictionary[StringName, String] = {}
 	for state: State in states:
 		state_names[state.stable_id] = str(state.name)
+	if _selected_transition != null and not transitions.has(_selected_transition):
+		_selected_transition = null
 
 	var outgoing_by_state: Dictionary = {}
 	var incoming_by_state: Dictionary = {}
@@ -220,8 +233,14 @@ func refresh() -> void:
 		graph_node.setup(
 				state,
 				state.stable_id == initial_id,
-				_get_outgoing(outgoing_by_state, state.stable_id),
-				_get_outgoing(incoming_by_state, state.stable_id)
+				_get_state_transitions(
+						outgoing_by_state,
+						state.stable_id
+				),
+				_get_state_transitions(
+						incoming_by_state,
+						state.stable_id
+				)
 		)
 		graph_node.position_offset = _get_state_position(state, index)
 		graph_node.scope_requested.connect(_show_scope)
@@ -233,7 +252,8 @@ func refresh() -> void:
 		_states_by_node_name[graph_node_name] = state
 		_graph_nodes_by_state_id[state.stable_id] = graph_node
 
-	for transition: StateTransition in transitions:
+	for transition_index: int in range(transitions.size()):
+		var transition: StateTransition = transitions[transition_index]
 		if transition == null:
 			continue
 		if (
@@ -247,9 +267,31 @@ func refresh() -> void:
 		var target_node: GStateGraphNode = _graph_nodes_by_state_id[
 				transition.to_state_id
 		]
+		var transition_node: GStateTransitionGraphNode = (
+				TransitionGraphNodeScript.new()
+		)
+		var transition_node_name := StringName(
+				"transition_node_%d" % transition_index
+		)
+		transition_node.name = transition_node_name
+		transition_node.setup(transition)
+		transition_node.position_offset = _get_transition_position(
+				transition,
+				transitions
+		)
+		transition_node.edit_requested.connect(_open_transition_edit)
+		_graph_edit.add_child(transition_node)
+		_transitions_by_node_name[transition_node_name] = transition
+		_graph_nodes_by_transition_id[transition.id] = transition_node
 		_graph_edit.connect_node(
 				source_node.name,
 				source_node.get_transition_output_port(transition),
+				transition_node.name,
+				0
+		)
+		_graph_edit.connect_node(
+				transition_node.name,
+				0,
 				target_node.name,
 				target_node.get_transition_input_port(transition)
 		)
@@ -288,6 +330,8 @@ func _clear_graph() -> void:
 	_node_names_by_state_id.clear()
 	_states_by_node_name.clear()
 	_graph_nodes_by_state_id.clear()
+	_transitions_by_node_name.clear()
+	_graph_nodes_by_transition_id.clear()
 	for child: Node in _graph_edit.get_children():
 		if child is GraphNode:
 			child.free()
@@ -452,6 +496,7 @@ func _after_state_added(state: State, child_scope: State) -> void:
 	if child_scope != null:
 		_scope = child_scope
 	_selected_state = state
+	_selected_transition = null
 	refresh()
 
 
@@ -572,6 +617,11 @@ func _delete_selected_state() -> void:
 	var new_positions: Dictionary = old_positions.duplicate(true)
 	for id: StringName in removed_ids:
 		new_positions.erase(id)
+	for transition: StateTransition in old_transitions:
+		if transition != null and not new_transitions.has(transition):
+			new_positions.erase(
+					StateMachineGraph.get_transition_position_key(transition)
+			)
 
 	var initial_owner: Object = (
 			_state_machine if parent == _state_machine else parent
@@ -720,6 +770,8 @@ func _create_pending_transition() -> void:
 			event_name,
 			_get_scope_id()
 	)
+	_selected_state = null
+	_selected_transition = transition
 	_undo_redo.create_action("GState: Add Transition")
 	_undo_redo.add_do_method(
 			_state_machine.graph,
@@ -735,13 +787,14 @@ func _create_pending_transition() -> void:
 
 
 func _edit_selected_transition() -> void:
-	if _transition_option.selected < 0 or _transition_option.item_count == 0:
-		return
-	var transition: StateTransition = _transition_option.get_item_metadata(
-			_transition_option.selected
-	)
+	_open_transition_edit(_get_selected_transition())
+
+
+func _open_transition_edit(transition: StateTransition) -> void:
 	if transition == null:
 		return
+	_selected_state = null
+	_selected_transition = transition
 	_editing_transition = transition
 	_pending_from_state = _find_state_by_id(transition.from_state_id)
 	_pending_to_state = _find_state_by_id(transition.to_state_id)
@@ -762,6 +815,7 @@ func _update_transition_event() -> void:
 	if new_event.is_empty():
 		return
 	if new_event == old_event:
+		_editing_transition = null
 		return
 	_undo_redo.create_action("GState: Edit Transition")
 	_undo_redo.add_do_property(_editing_transition, &"event", new_event)
@@ -773,22 +827,34 @@ func _update_transition_event() -> void:
 
 
 func _delete_selected_transition() -> void:
-	if (
-		_undo_redo == null
-		or _transition_option.selected < 0
-		or _transition_option.item_count == 0
-	):
+	if _undo_redo == null:
 		return
-	var transition: StateTransition = _transition_option.get_item_metadata(
-			_transition_option.selected
-	)
+	var transition := _get_selected_transition()
 	if transition == null:
 		return
+	var old_positions: Dictionary = (
+			_state_machine.graph.editor_positions.duplicate(true)
+	)
+	var new_positions: Dictionary = old_positions.duplicate(true)
+	new_positions.erase(
+			StateMachineGraph.get_transition_position_key(transition)
+	)
+	_selected_transition = null
 	_undo_redo.create_action("GState: Delete Transition")
 	_undo_redo.add_do_method(
 			_state_machine.graph,
 			&"remove_transition",
 			transition
+	)
+	_undo_redo.add_do_property(
+			_state_machine.graph,
+			&"editor_positions",
+			new_positions
+	)
+	_undo_redo.add_undo_property(
+			_state_machine.graph,
+			&"editor_positions",
+			old_positions
 	)
 	_undo_redo.add_undo_method(
 			_state_machine.graph,
@@ -800,7 +866,13 @@ func _delete_selected_transition() -> void:
 
 func _on_delete_nodes_requested(nodes: Array[StringName]) -> void:
 	for node_name: StringName in nodes:
+		if _transitions_by_node_name.has(node_name):
+			_selected_state = null
+			_selected_transition = _transitions_by_node_name[node_name]
+			_delete_selected_transition()
+			return
 		if _states_by_node_name.has(node_name):
+			_selected_transition = null
 			_selected_state = _states_by_node_name[node_name]
 			_delete_selected_state()
 			return
@@ -810,9 +882,17 @@ func _on_graph_node_selected(node: Node) -> void:
 	if _refreshing:
 		return
 	if node is GStateGraphNode:
+		_selected_transition = null
 		_selected_state = (node as GStateGraphNode).state
 		_update_action_buttons()
 		_select_state_in_editor.call_deferred(_selected_state)
+	elif node is GStateTransitionGraphNode:
+		_selected_state = null
+		_selected_transition = (
+				node as GStateTransitionGraphNode
+		).transition
+		_select_transition_option(_selected_transition)
+		_update_action_buttons()
 
 
 func _on_graph_node_deselected(node: Node) -> void:
@@ -823,6 +903,13 @@ func _on_graph_node_deselected(node: Node) -> void:
 		and _selected_state == (node as GStateGraphNode).state
 	):
 		_selected_state = null
+		_update_action_buttons()
+	elif (
+		node is GStateTransitionGraphNode
+		and _selected_transition
+		== (node as GStateTransitionGraphNode).transition
+	):
+		_selected_transition = null
 		_update_action_buttons()
 
 
@@ -858,13 +945,20 @@ func _on_end_node_move() -> void:
 		if child is GStateGraphNode:
 			var graph_node := child as GStateGraphNode
 			new_positions[graph_node.state.stable_id] = graph_node.position_offset
+		elif child is GStateTransitionGraphNode:
+			var transition_node := child as GStateTransitionGraphNode
+			new_positions[
+					StateMachineGraph.get_transition_position_key(
+							transition_node.transition
+					)
+			] = transition_node.position_offset
 	if new_positions == _positions_before_move:
 		return
 	if _undo_redo == null:
 		_state_machine.graph.editor_positions = new_positions
 		_mark_scene_unsaved()
 		return
-	_undo_redo.create_action("GState: Move States")
+	_undo_redo.create_action("GState: Move Graph Nodes")
 	_undo_redo.add_do_property(
 			_state_machine.graph,
 			&"editor_positions",
@@ -910,6 +1004,7 @@ func _show_scope(state: State) -> void:
 	_save_graph_view()
 	_scope = state
 	_selected_state = null
+	_selected_transition = null
 	refresh()
 
 
@@ -972,13 +1067,41 @@ func _rebuild_transition_options(
 				_transition_option.item_count - 1,
 				transition
 		)
+		if transition == _selected_transition:
+			_transition_option.select(_transition_option.item_count - 1)
 	_delete_transition_button.disabled = _transition_option.item_count == 0
 	_edit_transition_button.disabled = _transition_option.item_count == 0
 
 
-func _on_transition_selected(_index: int) -> void:
+func _on_transition_selected(index: int) -> void:
+	if index >= 0 and index < _transition_option.item_count:
+		_selected_state = null
+		_selected_transition = _transition_option.get_item_metadata(index)
+		if (
+			_selected_transition != null
+			and _graph_nodes_by_transition_id.has(_selected_transition.id)
+		):
+			_graph_edit.set_selected(
+					_graph_nodes_by_transition_id[_selected_transition.id]
+			)
 	_delete_transition_button.disabled = _transition_option.item_count == 0
 	_edit_transition_button.disabled = _transition_option.item_count == 0
+	_update_action_buttons()
+
+
+func _select_transition_option(transition: StateTransition) -> void:
+	for index: int in range(_transition_option.item_count):
+		if _transition_option.get_item_metadata(index) == transition:
+			_transition_option.select(index)
+			return
+
+
+func _get_selected_transition() -> StateTransition:
+	if _selected_transition != null:
+		return _selected_transition
+	if _transition_option.selected < 0 or _transition_option.item_count == 0:
+		return null
+	return _transition_option.get_item_metadata(_transition_option.selected)
 
 
 func _get_scope_states() -> Array[State]:
@@ -1021,14 +1144,14 @@ func _get_scope_transitions() -> Array[StateTransition]:
 	return _state_machine.graph.get_transitions_for_scope(_get_scope_id())
 
 
-func _get_outgoing(
-		outgoing_by_state: Dictionary,
+func _get_state_transitions(
+		transitions_by_state: Dictionary,
 		state_id: StringName
 ) -> Array[StateTransition]:
 	var result: Array[StateTransition] = []
-	if not outgoing_by_state.has(state_id):
+	if not transitions_by_state.has(state_id):
 		return result
-	for transition: StateTransition in outgoing_by_state[state_id]:
+	for transition: StateTransition in transitions_by_state[state_id]:
 		result.append(transition)
 	return result
 
@@ -1045,6 +1168,85 @@ func _get_state_position(state: State, index: int) -> Vector2:
 	return _state_machine.graph.get_state_position(state, fallback)
 
 
+func _get_transition_position(
+		transition: StateTransition,
+		transitions: Array[StateTransition]
+) -> Vector2:
+	var fallback := _get_default_transition_position(
+			transition,
+			transitions
+	)
+	if _state_machine.graph == null:
+		return fallback
+	return _state_machine.graph.get_transition_position(
+			transition,
+			fallback
+	)
+
+
+func _get_default_transition_position(
+		transition: StateTransition,
+		transitions: Array[StateTransition]
+) -> Vector2:
+	var source_node: GStateGraphNode = _graph_nodes_by_state_id[
+			transition.from_state_id
+	]
+	var target_node: GStateGraphNode = _graph_nodes_by_state_id[
+			transition.to_state_id
+	]
+	var siblings: Array[StateTransition] = []
+	var pair_key := _get_transition_pair_key(transition)
+	for candidate: StateTransition in transitions:
+		if (
+			candidate != null
+			and _get_transition_pair_key(candidate) == pair_key
+		):
+			siblings.append(candidate)
+	var lane_index: int = siblings.find(transition)
+	var lane_offset := (
+			float(lane_index) - float(siblings.size() - 1) * 0.5
+	) * PARALLEL_TRANSITION_SPACING
+
+	if transition.from_state_id == transition.to_state_id:
+		return (
+				source_node.position_offset
+				+ SELF_TRANSITION_OFFSET
+				+ Vector2(0.0, lane_offset)
+		)
+
+	var source_center := (
+			source_node.position_offset
+			+ source_node.get_combined_minimum_size() * 0.5
+	)
+	var target_center := (
+			target_node.position_offset
+			+ target_node.get_combined_minimum_size() * 0.5
+	)
+	var direction := target_center - source_center
+	var pair_ids := PackedStringArray([
+		str(transition.from_state_id),
+		str(transition.to_state_id),
+	])
+	pair_ids.sort()
+	if str(transition.from_state_id) != pair_ids[0]:
+		direction = -direction
+	var normal := Vector2(-direction.y, direction.x).normalized()
+	return (
+			(source_center + target_center) * 0.5
+			- TRANSITION_NODE_SIZE * 0.5
+			+ normal * lane_offset
+	)
+
+
+func _get_transition_pair_key(transition: StateTransition) -> String:
+	var ids := PackedStringArray([
+		str(transition.from_state_id),
+		str(transition.to_state_id),
+	])
+	ids.sort()
+	return "%s|%s" % [ids[0], ids[1]]
+
+
 func _restore_graph_view() -> void:
 	if _state_machine.graph == null:
 		_graph_edit.scroll_offset = Vector2.ZERO
@@ -1059,6 +1261,14 @@ func _restore_graph_view() -> void:
 
 
 func _restore_graph_selection() -> void:
+	if (
+		_selected_transition != null
+		and _graph_nodes_by_transition_id.has(_selected_transition.id)
+	):
+		_graph_edit.set_selected(
+				_graph_nodes_by_transition_id[_selected_transition.id]
+		)
+		return
 	if (
 		_selected_state != null
 		and _node_names_by_state_id.has(_selected_state.stable_id)
