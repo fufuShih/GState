@@ -166,19 +166,15 @@ func _run() -> void:
 		"root graph view displays direct child states"
 	)
 	_expect(
-		_count_transition_graph_nodes(graph_view) == 4,
-		"root graph view displays one node per scoped transition"
-	)
-	_expect(
-		_get_graph_edit(graph_view).connections.size() == 8,
-		"each root transition is displayed with two connections"
+		_get_graph_edit(graph_view).connections.size() == 4,
+		"each root transition is displayed as one direct connection"
 	)
 	var grounded_graph_node := _find_graph_node(graph_view, grounded)
 	var dead_graph_node := _find_graph_node(graph_view, dead)
 	_expect(
 		grounded_graph_node != null
 		and grounded_graph_node.get_output_port_count() == 2,
-		"State nodes expose numbered outgoing transition ports"
+		"State nodes expose one output port per transition"
 	)
 	_expect(
 		dead_graph_node != null
@@ -197,32 +193,6 @@ func _run() -> void:
 		),
 		"State nodes provide normal and selected color overrides"
 	)
-	var jump_transition_node := _find_transition_graph_node(
-			graph_view,
-			&"jump"
-	)
-	var land_transition_node := _find_transition_graph_node(
-			graph_view,
-			&"land"
-	)
-	_expect(
-		jump_transition_node != null
-		and jump_transition_node.get_input_port_count() == 1
-		and jump_transition_node.get_output_port_count() == 1,
-		"Transition nodes expose one input and one output port"
-	)
-	_expect(
-		jump_transition_node != null
-		and not jump_transition_node.has_theme_stylebox_override(&"panel")
-		and not jump_transition_node.has_theme_stylebox_override(&"titlebar"),
-		"Transition nodes keep the default editor colors"
-	)
-	_expect(
-		jump_transition_node != null
-		and jump_transition_node.title == "Transition →"
-		and (jump_transition_node.get_child(0) as Label).text == "jump",
-		"Transition nodes use a fixed title and show the event in the body"
-	)
 	var grounded_second_port_row: HBoxContainer
 	if grounded_graph_node != null and grounded_graph_node.get_child_count() > 3:
 		grounded_second_port_row = (
@@ -230,28 +200,42 @@ func _run() -> void:
 		)
 	_expect(
 		grounded_second_port_row != null
-		and (grounded_second_port_row.get_child(1) as Label).text == "1",
-		"State port rows display indexes without event names"
+		and (grounded_second_port_row.get_child(1) as Label).text == "die",
+		"State OUT rows display their transition event names"
 	)
+	var dead_first_port_row: HBoxContainer
+	if dead_graph_node != null and dead_graph_node.get_child_count() > 2:
+		dead_first_port_row = dead_graph_node.get_child(2) as HBoxContainer
 	_expect(
-		jump_transition_node != null
-		and land_transition_node != null
-		and jump_transition_node.position_offset
-		!= land_transition_node.position_offset,
-		"opposite transitions receive distinct default positions"
+		dead_first_port_row != null
+		and (dead_first_port_row.get_child(0) as Label).text == "0",
+		"State IN rows remain numbered"
 	)
+	var long_event := &"this_transition_event_name_must_stay_complete"
+	var long_transition := StateTransition.new(
+			grounded.stable_id,
+			dead.stable_id,
+			long_event
+	)
+	var long_outgoing: Array[StateTransition] = [long_transition]
+	var no_incoming: Array[StateTransition] = []
+	var preview_node := GStateGraphNode.new()
+	preview_node.setup(grounded, false, long_outgoing, no_incoming)
+	var preview_port_row := preview_node.get_child(2) as HBoxContainer
+	_expect(
+		preview_port_row != null
+		and (preview_port_row.get_child(1) as Label).text == str(long_event),
+		"State OUT labels keep the complete transition event"
+	)
+	preview_node.free()
 	graph_view._show_scope(grounded)
 	_expect(
 		_count_graph_nodes(graph_view) == 2,
 		"nested graph view displays direct child states"
 	)
 	_expect(
-		_count_transition_graph_nodes(graph_view) == 2,
-		"nested graph displays scoped transition nodes"
-	)
-	_expect(
-		_get_graph_edit(graph_view).connections.size() == 4,
-		"nested transitions are displayed with two connections each"
+		_get_graph_edit(graph_view).connections.size() == 2,
+		"nested transitions are displayed as direct connections"
 	)
 	graph_view.queue_free()
 
@@ -350,14 +334,6 @@ func _count_graph_nodes(editor: GStateMachineEditor) -> int:
 	return count
 
 
-func _count_transition_graph_nodes(editor: GStateMachineEditor) -> int:
-	var count := 0
-	for child: Node in _get_graph_edit(editor).get_children():
-		if child is GStateTransitionGraphNode:
-			count += 1
-	return count
-
-
 func _find_graph_node(
 		editor: GStateMachineEditor,
 		state: State
@@ -366,21 +342,6 @@ func _find_graph_node(
 		if child is GStateGraphNode and (child as GStateGraphNode).state == state:
 			return child as GStateGraphNode
 	return null
-
-
-func _find_transition_graph_node(
-		editor: GStateMachineEditor,
-		event: StringName
-) -> GStateTransitionGraphNode:
-	for child: Node in _get_graph_edit(editor).get_children():
-		if (
-			child is GStateTransitionGraphNode
-			and (child as GStateTransitionGraphNode).transition.event == event
-		):
-			return child as GStateTransitionGraphNode
-	return null
-
-
 func _expect(condition: bool, message: String) -> void:
 	if not condition:
 		_failures.append(message)

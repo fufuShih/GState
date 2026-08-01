@@ -61,8 +61,9 @@ Disabled --enable--> Enabled
 
 從右側綠色 `OUT` 拖到左側藍色 `IN`，然後輸入 Event 名稱。
 
-建立後會顯示成 `State → [event] → State`。可以拖曳中間的小型 Event
-Node 調整版面、雙擊它修改 Event，或選取後按 `Delete` 刪除 Transition。
+建立後，Event 名稱會完整顯示在來源 State 的綠色 `OUT` 旁；目標 State
+的藍色 `IN` 維持數字編號。若要修改或刪除 Transition，使用 Graph 上方的
+Transition 選擇器。
 
 進入子 Scope 時，上方摘要會顯示父層可用的 Exit events。離開 Nested
 State 不需要特殊節點；回到父 Scope，從 Compound State 建立 Transition

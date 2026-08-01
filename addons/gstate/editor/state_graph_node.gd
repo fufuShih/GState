@@ -151,7 +151,7 @@ func _create_port_row(
 			str(index) if index < maxi(1, incoming.size()) else ""
 	)
 	var output_text := (
-			str(index) if index < maxi(1, outgoing.size()) else ""
+			str(outgoing[index].event) if index < outgoing.size() else ""
 	)
 	row.add_child(_create_port_label(input_text, IN_PORT_COLOR, false))
 	row.add_child(_create_port_label(output_text, OUT_PORT_COLOR, true))
