@@ -1,0 +1,94 @@
+[gd_scene format=3 uid="uid://8p2mavwfpyki"]
+
+[ext_resource type="Script" uid="uid://b6iwt8dhfr5ua" path="res://addons/gstate/runtime/state_manager.gd" id="1_dw73y"]
+[ext_resource type="Script" uid="uid://vwxdsmrhf3ta" path="res://examples/sample3/example.gd" id="1_xmsfn"]
+[ext_resource type="Script" uid="uid://i50by6xe6v2e" path="res://addons/gstate/runtime/state_machine.gd" id="2_xmsfn"]
+[ext_resource type="Script" uid="uid://58h5uoomsyew" path="res://addons/gstate/runtime/state_machine_graph.gd" id="3_kb0mp"]
+[ext_resource type="Script" uid="uid://cmc34giy7r8q4" path="res://addons/gstate/runtime/state_transition.gd" id="4_wqi00"]
+[ext_resource type="Script" uid="uid://bkmlfi4nsituu" path="res://addons/gstate/runtime/state.gd" id="5_r37dv"]
+[ext_resource type="Resource" path="res://examples/sample3/session_context.tres" id="6_context"]
+
+[sub_resource type="Resource" id="Resource_jdqt4"]
+script = ExtResource("4_wqi00")
+id = &"transition_7670bd50e7c755f4"
+from_state_id = &"state_30933b671d07d9b5"
+to_state_id = &"state_217ff1bf897ae801"
+event = &"start"
+
+[sub_resource type="Resource" id="Resource_ydgej"]
+script = ExtResource("4_wqi00")
+id = &"transition_4f41d4bfda41a2cd"
+from_state_id = &"state_217ff1bf897ae801"
+to_state_id = &"state_217ff1bf897ae801"
+event = &"score"
+
+[sub_resource type="Resource" id="Resource_570h2"]
+script = ExtResource("4_wqi00")
+id = &"transition_635c98c3fc8e9c4f"
+from_state_id = &"state_217ff1bf897ae801"
+to_state_id = &"state_26a92f3194c32c09"
+event = &"finish"
+
+[sub_resource type="Resource" id="Resource_lxjei"]
+script = ExtResource("4_wqi00")
+id = &"transition_6e9ca322a9caa76c"
+from_state_id = &"state_26a92f3194c32c09"
+to_state_id = &"state_30933b671d07d9b5"
+event = &"next_round"
+
+[sub_resource type="Resource" id="Resource_2orfb"]
+script = ExtResource("3_kb0mp")
+transitions = Array[ExtResource("4_wqi00")]([SubResource("Resource_jdqt4"), SubResource("Resource_ydgej"), SubResource("Resource_570h2"), SubResource("Resource_lxjei")])
+editor_positions = {
+&"state_217ff1bf897ae801": Vector2(1134.0997, 210.70174),
+&"state_26a92f3194c32c09": Vector2(1609.5868, 329.57352),
+&"state_30933b671d07d9b5": Vector2(599, 124)
+}
+editor_zoom = 0.38554317
+
+[node name="Example" type="Node2D" unique_id=1287871559]
+script = ExtResource("1_xmsfn")
+
+[node name="TitleLabel" type="Label" parent="." unique_id=1385391606]
+offset_right = 40.0
+offset_bottom = 23.0
+
+[node name="StateLabel" type="Label" parent="." unique_id=1791510440]
+offset_top = 76.0
+offset_right = 40.0
+offset_bottom = 99.0
+
+[node name="ContextLabel" type="Label" parent="." unique_id=1280628763]
+offset_left = 6.0
+offset_top = 168.0
+offset_right = 46.0
+offset_bottom = 191.0
+
+[node name="HelpLabel" type="Label" parent="." unique_id=113345512]
+offset_left = 6.0
+offset_top = 223.0
+offset_right = 46.0
+offset_bottom = 246.0
+
+[node name="StateManager" type="Node" parent="." unique_id=294459491]
+script = ExtResource("1_dw73y")
+metadata/_custom_type_script = "uid://b6iwt8dhfr5ua"
+
+[node name="Session" type="Node" parent="StateManager" unique_id=414219371]
+script = ExtResource("2_xmsfn")
+initial_context = ExtResource("6_context")
+initial_state_id = &"state_30933b671d07d9b5"
+graph = SubResource("Resource_2orfb")
+metadata/_custom_type_script = "uid://i50by6xe6v2e"
+
+[node name="Idle" type="Node" parent="StateManager/Session" unique_id=1211668674]
+script = ExtResource("5_r37dv")
+stable_id = &"state_30933b671d07d9b5"
+
+[node name="Playing" type="Node" parent="StateManager/Session" unique_id=1641799057]
+script = ExtResource("5_r37dv")
+stable_id = &"state_217ff1bf897ae801"
+
+[node name="Result" type="Node" parent="StateManager/Session" unique_id=218654947]
+script = ExtResource("5_r37dv")
+stable_id = &"state_26a92f3194c32c09"

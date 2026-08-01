@@ -1,0 +1,104 @@
+[gd_scene format=3 uid="uid://b5welxfs6l2ip"]
+
+[ext_resource type="Script" uid="uid://byvxch2sdkra1" path="res://examples/simple_2_example.gd" id="1_7y1j5"]
+[ext_resource type="Script" uid="uid://b6iwt8dhfr5ua" path="res://addons/gstate/runtime/state_manager.gd" id="2_aixjl"]
+[ext_resource type="Script" uid="uid://i50by6xe6v2e" path="res://addons/gstate/runtime/state_machine.gd" id="3_730l0"]
+[ext_resource type="Script" uid="uid://58h5uoomsyew" path="res://addons/gstate/runtime/state_machine_graph.gd" id="4_x6xjn"]
+[ext_resource type="Script" uid="uid://cmc34giy7r8q4" path="res://addons/gstate/runtime/state_transition.gd" id="5_02s3v"]
+[ext_resource type="Script" uid="uid://bkmlfi4nsituu" path="res://addons/gstate/runtime/state.gd" id="6_tx2nr"]
+
+[sub_resource type="Resource" id="Resource_nad34"]
+script = ExtResource("5_02s3v")
+id = &"transition_1aa382b1847f2e3f"
+from_state_id = &"state_5a6cbb5480144af6"
+to_state_id = &"state_1750f66c8c36dfd4"
+event = &"toggle"
+
+[sub_resource type="Resource" id="Resource_toggle_off"]
+script = ExtResource("5_02s3v")
+id = &"transition_toggle_off"
+from_state_id = &"state_1750f66c8c36dfd4"
+to_state_id = &"state_5a6cbb5480144af6"
+event = &"toggle"
+
+[sub_resource type="Resource" id="Resource_sbiap"]
+script = ExtResource("5_02s3v")
+id = &"transition_168fbaa939276cc6"
+scope_id = &"state_1750f66c8c36dfd4"
+from_state_id = &"state_62b318643f6b51ee"
+to_state_id = &"state_52357b56b05123f6"
+event = &"activate"
+
+[sub_resource type="Resource" id="Resource_qwft7"]
+script = ExtResource("5_02s3v")
+id = &"transition_1808b410dfe719a4"
+scope_id = &"state_1750f66c8c36dfd4"
+from_state_id = &"state_52357b56b05123f6"
+to_state_id = &"state_62b318643f6b51ee"
+event = &"idle"
+
+[sub_resource type="Resource" id="Resource_y71st"]
+script = ExtResource("5_02s3v")
+id = &"transition_77534d6bb1a6d048"
+scope_id = &"state_1750f66c8c36dfd4"
+from_state_id = &"state_52357b56b05123f6"
+to_state_id = &"state_2a0b020b53606972"
+event = &"lock"
+
+[sub_resource type="Resource" id="Resource_bv7l3"]
+script = ExtResource("5_02s3v")
+id = &"transition_7673c170a4f921dd"
+scope_id = &"state_1750f66c8c36dfd4"
+from_state_id = &"state_2a0b020b53606972"
+to_state_id = &"state_62b318643f6b51ee"
+event = &"unlock"
+
+[sub_resource type="Resource" id="Resource_ov770"]
+script = ExtResource("4_x6xjn")
+transitions = Array[ExtResource("5_02s3v")]([SubResource("Resource_nad34"), SubResource("Resource_toggle_off"), SubResource("Resource_sbiap"), SubResource("Resource_qwft7"), SubResource("Resource_y71st"), SubResource("Resource_bv7l3")])
+editor_positions = {
+&"state_1750f66c8c36dfd4": Vector2(1501.2004, 232.17996),
+&"state_2a0b020b53606972": Vector2(2012.9685, 843.0883),
+&"state_52357b56b05123f6": Vector2(1574.1608, 518.2602),
+&"state_5a6cbb5480144af6": Vector2(965, 106.5),
+&"state_62b318643f6b51ee": Vector2(814.48035, 404.7399)
+}
+editor_zoom = 0.7687919
+
+[node name="Simple2Example" type="Node2D" unique_id=1635501006]
+script = ExtResource("1_7y1j5")
+
+[node name="StatusLabel" type="Label" parent="." unique_id=1151208779]
+offset_right = 40.0
+offset_bottom = 23.0
+
+[node name="StateManager" type="Node" parent="." unique_id=474803638]
+script = ExtResource("2_aixjl")
+metadata/_custom_type_script = "uid://b6iwt8dhfr5ua"
+
+[node name="Toggle" type="Node" parent="StateManager" unique_id=686737338]
+script = ExtResource("3_730l0")
+initial_state_id = &"state_5a6cbb5480144af6"
+graph = SubResource("Resource_ov770")
+metadata/_custom_type_script = "uid://i50by6xe6v2e"
+
+[node name="Off" type="Node" parent="StateManager/Toggle" unique_id=27314508]
+script = ExtResource("6_tx2nr")
+stable_id = &"state_5a6cbb5480144af6"
+
+[node name="On" type="Node" parent="StateManager/Toggle" unique_id=479962739]
+script = ExtResource("6_tx2nr")
+stable_id = &"state_1750f66c8c36dfd4"
+initial_child_id = &"state_62b318643f6b51ee"
+
+[node name="Idle" type="Node" parent="StateManager/Toggle/On" unique_id=1230691962]
+script = ExtResource("6_tx2nr")
+stable_id = &"state_62b318643f6b51ee"
+
+[node name="Active" type="Node" parent="StateManager/Toggle/On" unique_id=1693019848]
+script = ExtResource("6_tx2nr")
+stable_id = &"state_52357b56b05123f6"
+
+[node name="Locked" type="Node" parent="StateManager/Toggle/On" unique_id=686774816]
+script = ExtResource("6_tx2nr")
+stable_id = &"state_2a0b020b53606972"
