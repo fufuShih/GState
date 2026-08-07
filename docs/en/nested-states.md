@@ -1,6 +1,6 @@
 # Nested States
 
-[Documentation index](README.md) | [Traditional Chinese](../zh-TW/nested-states.md)
+[Documentation index](README.md) | [Traditional Chinese](../zh-Hant/nested-states.md)
 
 A State becomes a compound state when it contains other States:
 

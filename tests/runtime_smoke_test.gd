@@ -54,11 +54,11 @@ func _run() -> void:
 	grounded.initial_child_id = idle.stable_id
 	airborne.initial_child_id = jump.stable_id
 
-	_add_transition(machine, grounded, airborne, &"jump")
+	_add_transition(machine, grounded, airborne, &"jump", null, &"launch")
 	_add_transition(machine, airborne, grounded, &"land")
 	_add_transition(machine, grounded, dead, &"die")
 	_add_transition(machine, airborne, dead, &"die")
-	_add_transition(machine, idle, run, &"move", grounded)
+	_add_transition(machine, idle, run, &"move", grounded, &"start_running")
 	_add_transition(machine, run, idle, &"stop", grounded)
 	_add_transition(machine, jump, fall, &"falling", airborne)
 
@@ -122,14 +122,23 @@ func _run() -> void:
 	_expect(manager.send_to(&"Movement", &"move"), "manager routes an event")
 	_expect_path(machine, "Grounded/Run")
 	_expect_path(ui_machine, "Closed")
-	_expect_calls(["exit:Idle", "enter:Run"], "sibling lifecycle order")
+	_expect_calls(
+		["exit:Idle", "action:Idle:start_running", "enter:Run"],
+		"sibling transition action order"
+	)
 
 	_calls.clear()
 	_expect(machine.send(&"jump", {"strength": 1.0}), "parent fallback jump")
 	_expect_path(machine, "Airborne/Jump")
 	_expect_calls(
-		["exit:Run", "exit:Grounded", "enter:Airborne", "enter:Jump"],
-		"parent transition lifecycle order"
+		[
+			"exit:Run",
+			"exit:Grounded",
+			"action:Grounded:launch",
+			"enter:Airborne",
+			"enter:Jump",
+		],
+		"parent transition action order"
 	)
 
 	_expect(machine.send(&"falling"), "Jump falling transition")
@@ -139,8 +148,13 @@ func _run() -> void:
 	_expect(machine.send(&"die"), "Grounded die transition")
 	_expect_path(machine, "Dead")
 
+	_calls.clear()
 	_expect(machine.travel("Grounded/Run"), "travel to nested path")
 	_expect_path(machine, "Grounded/Run")
+	_expect_calls(
+		["exit:Dead", "enter:Grounded", "enter:Run"],
+		"travel bypasses transition actions"
+	)
 	_expect(machine.get_state("Grounded/Run") == run, "get_state resolves Node paths")
 	_expect(machine.is_in_state(grounded), "compound State reference is active")
 	_expect(machine.is_in_state("Grounded"), "compound path is active")
@@ -295,7 +309,8 @@ func _add_transition(
 		from_state: State,
 		to_state: State,
 		event: StringName,
-		scope: State = null
+		scope: State = null,
+		action: StringName = &""
 ) -> void:
 	var scope_id := StateTransition.ROOT_SCOPE_ID
 	if scope != null:
@@ -304,7 +319,8 @@ func _add_transition(
 			from_state.stable_id,
 			to_state.stable_id,
 			event,
-			scope_id
+			scope_id,
+			action
 	)
 	_expect(machine.graph.add_transition(transition), "transition must be added")
 

@@ -10,16 +10,19 @@ const ROOT_SCOPE_ID: StringName = &""
 @export var from_state_id: StringName = &""
 @export var to_state_id: StringName = &""
 @export var event: StringName = &""
+@export var action: StringName = &""
 
 
 func _init(
 		from_id: StringName = &"",
 		to_id: StringName = &"",
 		event_name: StringName = &"",
-		transition_scope_id: StringName = ROOT_SCOPE_ID
+		transition_scope_id: StringName = ROOT_SCOPE_ID,
+		action_name: StringName = &""
 ) -> void:
 	id = StringName("transition_%x" % ResourceUID.create_id())
 	from_state_id = from_id
 	to_state_id = to_id
 	event = event_name
 	scope_id = transition_scope_id
+	action = action_name

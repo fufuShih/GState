@@ -140,8 +140,8 @@ tooltip_text = "Transitions in the current scope"
 [node name="EditTransitionButton" type="Button" parent="Layout/Toolbar/Rows/Actions"]
 unique_name_in_owner = true
 layout_mode = 2
-tooltip_text = "Edit the selected transition event"
-text = "Edit Event"
+tooltip_text = "Edit the selected transition event and optional action"
+text = "Edit Transition"
 
 [node name="DeleteTransitionButton" type="Button" parent="Layout/Toolbar/Rows/Actions"]
 unique_name_in_owner = true
@@ -181,14 +181,14 @@ vertical_alignment = 1
 [node name="TransitionDialog" type="ConfirmationDialog" parent="."]
 unique_name_in_owner = true
 title = "Create Transition"
-size = Vector2i(380, 150)
+size = Vector2i(380, 210)
 ok_button_text = "Create"
 
 [node name="Content" type="VBoxContainer" parent="TransitionDialog"]
 offset_left = 8.0
 offset_top = 8.0
 offset_right = 372.0
-offset_bottom = 104.0
+offset_bottom = 164.0
 theme_override_constants/separation = 6
 
 [node name="Prompt" type="Label" parent="TransitionDialog/Content"]
@@ -199,6 +199,15 @@ text = "Event"
 unique_name_in_owner = true
 layout_mode = 2
 placeholder_text = "toggle"
+
+[node name="ActionPrompt" type="Label" parent="TransitionDialog/Content"]
+layout_mode = 2
+text = "Action (optional)"
+
+[node name="ActionEdit" type="LineEdit" parent="TransitionDialog/Content"]
+unique_name_in_owner = true
+layout_mode = 2
+placeholder_text = "play_toggle_sound"
 
 [node name="TransitionError" type="Label" parent="TransitionDialog/Content"]
 unique_name_in_owner = true

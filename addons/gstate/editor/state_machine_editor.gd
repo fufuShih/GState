@@ -32,6 +32,7 @@ const FALLBACK_COLUMNS := 3
 @onready var _empty_hint: Label = %EmptyHint
 @onready var _transition_dialog: ConfirmationDialog = %TransitionDialog
 @onready var _event_edit: LineEdit = %EventEdit
+@onready var _action_edit: LineEdit = %ActionEdit
 @onready var _transition_error: Label = %TransitionError
 @onready var _rename_dialog: ConfirmationDialog = %RenameDialog
 @onready var _state_name_edit: LineEdit = %StateNameEdit
@@ -669,9 +670,10 @@ func _request_transition(
 	_transition_dialog.title = "Create Transition"
 	_transition_dialog.ok_button_text = "Create"
 	_event_edit.clear()
+	_action_edit.clear()
 	_transition_error.text = ""
 	_transition_dialog.get_ok_button().disabled = true
-	_transition_dialog.popup_centered(Vector2i(380, 150))
+	_transition_dialog.popup_centered(Vector2i(380, 210))
 	_event_edit.call_deferred(&"grab_focus")
 
 
@@ -704,7 +706,7 @@ func _validate_pending_event(text: String) -> void:
 
 func _confirm_transition_dialog() -> void:
 	if _editing_transition != null:
-		_update_transition_event()
+		_update_transition()
 	else:
 		_create_pending_transition()
 
@@ -717,6 +719,7 @@ func _create_pending_transition() -> void:
 	):
 		return
 	var event_name := StringName(_event_edit.text.strip_edges())
+	var action_name := StringName(_action_edit.text.strip_edges())
 	if event_name.is_empty():
 		return
 	_ensure_graph()
@@ -724,7 +727,8 @@ func _create_pending_transition() -> void:
 			_pending_from_state.stable_id,
 			_pending_to_state.stable_id,
 			event_name,
-			_get_scope_id()
+			_get_scope_id(),
+			action_name
 	)
 	_selected_state = null
 	_undo_redo.create_action("GState: Add Transition")
@@ -756,26 +760,31 @@ func _edit_selected_transition() -> void:
 	_transition_dialog.title = "Edit Transition"
 	_transition_dialog.ok_button_text = "Save"
 	_event_edit.text = str(transition.event)
+	_action_edit.text = str(transition.action)
 	_validate_pending_event(_event_edit.text)
-	_transition_dialog.popup_centered(Vector2i(380, 150))
+	_transition_dialog.popup_centered(Vector2i(380, 210))
 	_event_edit.select_all()
 	_event_edit.call_deferred(&"grab_focus")
 
 
-func _update_transition_event() -> void:
+func _update_transition() -> void:
 	if _editing_transition == null or _undo_redo == null:
 		return
 	var new_event := StringName(_event_edit.text.strip_edges())
+	var new_action := StringName(_action_edit.text.strip_edges())
 	var old_event: StringName = _editing_transition.event
+	var old_action: StringName = _editing_transition.action
 	if new_event.is_empty():
 		return
-	if new_event == old_event:
+	if new_event == old_event and new_action == old_action:
 		_editing_transition = null
 		return
 	_undo_redo.create_action("GState: Edit Transition")
 	_undo_redo.add_do_property(_editing_transition, &"event", new_event)
+	_undo_redo.add_do_property(_editing_transition, &"action", new_action)
 	_undo_redo.add_do_method(_state_machine.graph, &"emit_changed")
 	_undo_redo.add_undo_property(_editing_transition, &"event", old_event)
+	_undo_redo.add_undo_property(_editing_transition, &"action", old_action)
 	_undo_redo.add_undo_method(_state_machine.graph, &"emit_changed")
 	_undo_redo.commit_action()
 	_editing_transition = null

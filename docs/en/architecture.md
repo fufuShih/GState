@@ -1,6 +1,6 @@
 # Architecture
 
-[Documentation index](README.md) | [Traditional Chinese](../zh-TW/architecture.md)
+[Documentation index](README.md) | [Traditional Chinese](../zh-Hant/architecture.md)
 
 GState uses three levels of nodes:
 
@@ -57,3 +57,13 @@ A state needs internal substates         → use nested states
 When a stopped machine starts, it creates a deep runtime copy. Every State in
 the machine receives that same live Dictionary through `get_context()`, while
 different machines remain isolated.
+
+## Transition actions
+
+A transition may store one optional Action name. After matching an event, the
+source State receives that name through perform_action(). The order is:
+
+    Exit source path → perform optional action → enter target path
+
+The Action remains a simple StringName; no Action Resource, array, or extra
+scene node is required.

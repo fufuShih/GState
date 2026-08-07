@@ -1,6 +1,6 @@
 # Runtime API
 
-[Documentation index](README.md) | [Traditional Chinese](../zh-TW/runtime-api.md)
+[Documentation index](README.md) | [Traditional Chinese](../zh-Hant/runtime-api.md)
 
 ## StateManager
 
@@ -47,9 +47,37 @@ state_machine.travel($StateManager/Movement/Grounded/Run)
 ```
 
 - `send()` searches the current active path for an event transition.
-- `payload` is passed to `enter()` and signals for that transition.
+- `payload` is passed to the optional action, `enter()`, and transition signals.
 - `travel()` moves directly to a State or state path without a transition.
 - Entering a compound state automatically follows its initial children.
+
+### Transition actions
+
+The Graph Editor provides one optional Action name on each transition. The
+State that owns the matched transition handles it:
+
+    extends State
+
+
+    func perform_action(
+            action: StringName,
+            _target_state: State,
+            payload: Variant = null
+    ) -> void:
+        match action:
+            &"apply_jump":
+                actor.velocity.y = payload.get("velocity", 5.0)
+            &"play_sound":
+                actor.jump_audio.play()
+
+- Actions run after source exit hooks and before target entry hooks.
+- Parent fallback transitions call perform_action() on the parent State that
+  owns the transition.
+- An empty Action does nothing.
+- travel() does not execute an Action because it bypasses transitions.
+- Use one Action name to group several related side effects.
+- If an Action must send another event, use send.call_deferred() because the
+  current transition is still in progress.
 
 ### Context
 
@@ -122,6 +150,14 @@ func exit(next_state: State) -> void:
 	pass
 
 
+func perform_action(
+		action: StringName,
+		_target_state: State,
+		payload: Variant = null
+) -> void:
+	pass
+
+
 func update(delta: float) -> void:
 	pass
 
@@ -135,6 +171,7 @@ Lifecycle order:
 ```text
 Enter / Update / Physics → parent to child
 Exit                     → child to parent
+Transition               → exit, optional action, enter
 ```
 
 States do not need to enable `_process()` themselves. The StateMachine drives

@@ -1,6 +1,6 @@
 # GState Documentation
 
-English | [Traditional Chinese](../zh-TW/README.md)
+English | [Traditional Chinese](../zh-Hant/README.md)
 
 GState is a hierarchical, event-driven state machine addon for Godot. The
 Scene Tree owns the state hierarchy, while transitions and graph layout are
@@ -23,6 +23,7 @@ saved with the scene automatically.
 - Event lookup from the deepest active state toward its parents
 - Initial children for compound states
 - Parent-scope exit events displayed inside child scopes
+- One optional action per transition
 - Dictionary context shared by states in one machine
 - `enter()`, `exit()`, `update()`, and `physics_update()`
 - Graph Editor operations with Undo/Redo
@@ -32,6 +33,5 @@ saved with the scene automatically.
 - Parallel states
 - History states
 - Guards and conditions
-- Transition actions
 - Any State
 - Direct graph connections across scopes

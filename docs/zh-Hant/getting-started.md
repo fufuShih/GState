@@ -59,7 +59,8 @@ Enabled --disable--> Disabled
 Disabled --enable--> Enabled
 ```
 
-從右側綠色 `OUT` 拖到左側藍色 `IN`，然後輸入 Event 名稱。
+從右側綠色 `OUT` 拖到左側藍色 `IN`，然後輸入 Event 名稱。選填的 Action
+欄位可以保持空白。
 
 建立後，Event 名稱會完整顯示在來源 State 的綠色 `OUT` 旁；目標 State
 的藍色 `IN` 維持數字編號。若要修改或刪除 Transition，使用 Graph 上方的

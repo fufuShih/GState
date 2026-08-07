@@ -145,7 +145,13 @@ func send(event: StringName, payload: Variant = null) -> bool:
 			var target: State = states_by_id.get(transition.to_state_id)
 			if target == null or not target.enabled:
 				break
-			return _change_state(target, payload, event)
+			return _change_state(
+					target,
+					payload,
+					event,
+					source,
+					transition.action
+			)
 
 	transition_rejected.emit(event, payload)
 	return false
@@ -157,7 +163,7 @@ func travel(state_path: Variant, payload: Variant = null) -> bool:
 	var target: State = _resolve_state_reference(state_path)
 	if target == null or not target.enabled:
 		return false
-	return _change_state(target, payload, &"")
+	return _change_state(target, payload, &"", null, &"")
 
 
 func get_state(state_path: Variant) -> State:
@@ -266,7 +272,9 @@ func validate() -> Dictionary:
 func _change_state(
 		target: State,
 		payload: Variant,
-		event: StringName
+		event: StringName,
+		action_source: State,
+		action_name: StringName
 ) -> bool:
 	var target_path: Array[State] = _expand_initial_children(
 			_resolve_target_path(target)
@@ -285,6 +293,8 @@ func _change_state(
 
 	_transitioning = true
 	_exit_to_common_ancestor(common_length, target_path.back())
+	if action_source != null and not action_name.is_empty():
+		action_source.perform_action(action_name, target, payload)
 	_enter_from_common_ancestor(
 			target_path,
 			common_length,

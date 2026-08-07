@@ -52,3 +52,12 @@ State 時會自動成為 Compound State。
 兩組狀態可以同時存在   → 建立兩台獨立 StateMachine
 一個狀態內還有細分狀態 → 使用 Nested State
 ```
+
+## Transition Action
+
+每條 Transition 可以保存一個選填的 Action 名稱。Event 命中後，由擁有
+該 Transition 的來源 State 透過 perform_action() 處理：
+
+    離開來源路徑 → 執行選填 Action → 進入目標路徑
+
+Action 只是一個 StringName，不需要 Action Resource、Array 或額外 Node。

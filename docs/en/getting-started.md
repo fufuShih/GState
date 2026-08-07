@@ -1,6 +1,6 @@
 # Node2D Quick Start
 
-[Documentation index](README.md) | [Traditional Chinese](../zh-TW/getting-started.md)
+[Documentation index](README.md) | [Traditional Chinese](../zh-Hant/getting-started.md)
 
 ## 1. Enable the addon
 
@@ -60,7 +60,7 @@ Disabled --enable--> Enabled
 ```
 
 Drag from the green `OUT` port on the right to the blue `IN` port on the left,
-then enter the event name.
+then enter the event name. The optional Action field can remain empty.
 
 The full event name is displayed beside the source State's green `OUT` port.
 The target State's blue `IN` ports remain numbered. Use the transition selector

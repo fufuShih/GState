@@ -22,6 +22,7 @@ GState 是 Godot 的階層式、事件驅動狀態機插件。狀態階層由 Sc
 - 事件由最深層往父層搜尋
 - Compound State 的 Initial Child
 - 子 Scope 顯示父層可用的 Exit events
+- 每條 Transition 可設定一個選填 Action
 - 同一台 Machine 內共用的 Context Dictionary
 - `enter()`、`exit()`、`update()` 與 `physics_update()`
 - Graph Editor 與 Undo/Redo
@@ -31,6 +32,5 @@ GState 是 Godot 的階層式、事件驅動狀態機插件。狀態階層由 Sc
 - Parallel State
 - History State
 - Guard 與 Condition
-- Transition Action
 - Any State
 - 跨 Scope 的直接 Graph 連線

@@ -1,7 +1,7 @@
 # GState
 
 See the [English documentation](../../docs/en/README.md) or
-[Traditional Chinese documentation](../../docs/zh-TW/README.md).
+[Traditional Chinese documentation](../../docs/zh-Hant/README.md).
 
 Graph nodes use separate, color-coded `IN` and `OUT` columns. Each transition
 occupies its own taller row and shows only its event name; the connection itself
@@ -66,6 +66,18 @@ State in that machine receives the same live runtime copy through
 `get_context()`. Starting a stopped machine or calling `restart()` creates a
 fresh deep copy, so the Inspector defaults stay unchanged.
 
+Each transition can have one optional Action name. The source State handles it
+after exit hooks and before target entry:
+
+    func perform_action(
+            action: StringName,
+            _target_state: State,
+            payload: Variant = null
+    ) -> void:
+        match action:
+            &"apply_jump":
+                actor.velocity.y = payload.get("velocity", 5.0)
+
 Override any lifecycle hooks needed by a State script:
 
 ```gdscript
@@ -77,6 +89,13 @@ func enter(previous_state: State, payload: Variant = null) -> void:
 func exit(next_state: State) -> void:
 	pass
 
+func perform_action(
+		action: StringName,
+		_target_state: State,
+		_payload: Variant = null
+) -> void:
+	pass
+
 func update(delta: float) -> void:
 	pass
 
@@ -85,6 +104,7 @@ func physics_update(delta: float) -> void:
 ```
 
 Hooks run parent-to-child on enter/update and child-to-parent on exit.
+Transition order is exit, optional action, then enter.
 `StateMachine.validate()` returns `errors` and `warnings` as
 `PackedStringArray`s. `start()` validates the complete state tree and safely
 refuses to run when errors are present.
@@ -106,10 +126,11 @@ below it displays only that machine's current State scope:
 - `+ Child State` creates a child under the selected State.
 - `Rename` renames the selected State; double-clicking a leaf does the same.
 - `Set Initial` marks the selected State as the scope's initial State.
-- Drag an output port to an input port, then enter the transition event.
+- Drag an output port to an input port, then enter the transition event and an
+  optional action name.
 - Every saved incoming and outgoing transition gets its own port row, so
   multiple transitions on one State no longer overlap on a single point.
-- Edit or delete the transition selected in the transition list.
+- Edit the event or optional action of the selected transition, or delete it.
 - Delete selected States and their descendant graph data.
 - Dragging nodes saves their positions in `StateMachineGraph`.
 - Nodes only begin dragging from the titlebar after a short movement threshold.

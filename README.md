@@ -7,6 +7,7 @@ edited through a scope-based graph editor.
 - Nested and compound states
 - Multiple independent state machines per manager
 - Event-driven transitions with parent-scope fallback
+- One optional action per transition
 - Dictionary context shared by states in one machine
 - State lifecycle hooks and active-path queries
 - Graph editing with Undo/Redo support
@@ -14,7 +15,7 @@ edited through a scope-based graph editor.
 ## Documentation
 
 - [English documentation](docs/en/README.md)
-- [Traditional Chinese documentation](docs/zh-TW/README.md)
+- [Traditional Chinese documentation](docs/zh-Hant/README.md)
 
 The addon is located in `addons/gstate/`. Enable **GState** from
 **Project > Project Settings > Plugins** after copying it into a Godot project.

@@ -46,9 +46,36 @@ state_machine.travel($StateManager/Movement/Grounded/Run)
 ```
 
 - `send()` 根據目前 Active Path 搜尋 Event Transition。
-- `payload` 只在本次切換中傳給 `enter()` 與 Signal。
+- `payload` 會傳給選填 Action、`enter()` 與本次切換的 Signal。
 - `travel()` 不需要 Transition，會直接前往 State 或 State Path。
 - 進入 Compound State 時會自動展開 Initial Child。
+
+### Transition Action
+
+Graph Editor 允許每條 Transition 設定一個選填 Action 名稱。由擁有該
+Transition 的來源 State 處理：
+
+    extends State
+
+
+    func perform_action(
+            action: StringName,
+            _target_state: State,
+            payload: Variant = null
+    ) -> void:
+        match action:
+            &"apply_jump":
+                actor.velocity.y = payload.get("velocity", 5.0)
+            &"play_sound":
+                actor.jump_audio.play()
+
+- Action 會在來源 State 的 exit() 之後、目標 State 的 enter() 之前執行。
+- 父層 fallback Transition 會由擁有 Transition 的父 State 執行 Action。
+- Action 留空時不做任何事。
+- travel() 會略過 Transition，因此不會執行 Action。
+- 多個相關副作用可以包在同一個 Action 名稱中。
+- Action 若需要送出下一個 Event，請使用 send.call_deferred()，因為目前
+  Transition 尚未結束。
 
 ### Context
 
@@ -121,6 +148,14 @@ func exit(next_state: State) -> void:
 	pass
 
 
+func perform_action(
+		action: StringName,
+		_target_state: State,
+		payload: Variant = null
+) -> void:
+	pass
+
+
 func update(delta: float) -> void:
 	pass
 
@@ -134,6 +169,7 @@ func physics_update(delta: float) -> void:
 ```text
 Enter／Update／Physics → 父到子
 Exit                   → 子到父
+Transition             → exit、選填 action、enter
 ```
 
 State 不需要自行啟用 `_process()`；只有 Active Path 上的 State 會由
