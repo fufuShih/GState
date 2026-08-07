@@ -22,7 +22,10 @@ Example (Node2D)
 ├── Status (Label)
 └── StateManager
 	└── Main (StateMachine)
-		└── definition = main_state_machine.tres
+		├── Enabled
+		│   ├── Idle
+		│   └── Moving
+		└── Disabled
 ```
 
 先建立 `StateManager`。選取它後，在底部 GState 面板點
@@ -39,21 +42,6 @@ Example (Node2D)
 
 每個 Scope 的第一個 State 會自動成為 Initial State，也可以選取 State
 後按 `Set Initial` 修改。
-
-所有操作都會寫入 `StateMachine.definition`，不會在 Main 底下建立
-State 子節點。Graph 上方的 Definition 列會顯示目前是內嵌資源或外部
-`.tres`；按 **Save As...** 可存成 `main_state_machine.tres`。其他場景
-只要把同一份資源指派給 StateMachine，就能共用相同定義；若只想修改
-其中一台，先按 **Make Unique**。每台 Machine 的 runtime State 仍會
-各自複製，不會互相污染。
-
-在 Graph 選取 State 時，Godot 原生 Inspector 會直接開啟該資源；選取
-Transition 時則會開啟它的來源 State，因為 Transition 就存放在該
-State 的 `transitions` 欄位。
-
-State 的 `Transitions` 屬性會為每條連線顯示 Event 欄位、同 Scope
-Target 下拉選單與刪除按鈕；使用 `+ Add Transition` 就能新增，不需要
-複製任何內部 ID。
 
 ## 3. 建立 Transition
 

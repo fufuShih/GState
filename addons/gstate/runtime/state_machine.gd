@@ -15,40 +15,25 @@ signal transition_rejected(event: StringName, payload: Variant)
 signal state_entered(state: State)
 signal state_exited(state: State)
 signal active_path_changed(path: Array[State])
-signal definition_changed
 
 @export var active: bool = true
 @export var autostart: bool = true
 @export var actor: Node
-@export_category("State Machine Resource")
-@export var definition: StateMachineResource = StateMachineResource.new():
-	set(value):
-		if definition == value:
-			return
-		_disconnect_definition()
-		definition = value
-		_connect_definition()
-		update_configuration_warnings()
-		definition_changed.emit()
+@export var context: Dictionary = {}
+@export_storage var initial_state_id: StringName = &""
+@export_storage var graph: StateMachineGraph = StateMachineGraph.new()
 
-## Compatibility accessors for code using the previous API.
-var graph: StateMachineResource:
-	get:
-		return definition
-	set(value):
-		definition = value
-var states_by_uid: Dictionary[StringName, State] = {}
+var states_by_id: Dictionary[StringName, State] = {}
 var active_path: Array[State] = []
 var state_manager: Node
 
-var _runtime_root_states: Array[State] = []
 var _running: bool = false
 var _transitioning: bool = false
 var _context: Dictionary = {}
 
 
 func _ready() -> void:
-	_connect_definition()
+	_rebuild_state_registry()
 	if Engine.is_editor_hint():
 		set_process(false)
 		set_physics_process(false)
@@ -65,12 +50,6 @@ func _ready() -> void:
 		return
 	if autostart and active:
 		start()
-
-
-func _exit_tree() -> void:
-	if _running:
-		stop()
-	_disconnect_definition()
 
 
 func _process(delta: float) -> void:
@@ -97,25 +76,22 @@ func start() -> bool:
 	if not active:
 		return false
 
+	_rebuild_state_registry()
 	var validation: Dictionary = validate()
 	if not _report_validation(validation):
 		return false
 
-	reset_context()
-	_rebuild_state_registry()
-	var initial: State = _find_direct_state_by_name(
-			_runtime_root_states,
-			definition.initial_state
-	)
-	if initial == null:
+	var initial_state: State = states_by_id.get(initial_state_id)
+	if initial_state == null:
 		return false
 
 	var target_path: Array[State] = _expand_initial_children(
-			_resolve_target_path(initial)
+			_resolve_target_path(initial_state)
 	)
 	if target_path.is_empty() or not _is_path_enabled(target_path):
 		return false
 
+	reset_context()
 	_running = true
 	_transitioning = true
 	_enter_from_common_ancestor(target_path, 0, null, null)
@@ -157,14 +133,16 @@ func send(event: StringName, payload: Variant = null) -> bool:
 
 	for index: int in range(active_path.size() - 1, -1, -1):
 		var source: State = active_path[index]
-		var target_name: StringName = source.get_transition_target(event)
-		if not target_name.is_empty():
-			var siblings: Array[State] = (
-				source.parent_state.get_state_children()
-				if source.parent_state != null
-				else _runtime_root_states
-			)
-			var target := _find_direct_state_by_name(siblings, target_name)
+		var scope_id: StringName = StateTransition.ROOT_SCOPE_ID
+		if source.parent_state != null:
+			scope_id = source.parent_state.stable_id
+		var transition: StateTransition = graph.find_transition(
+				scope_id,
+				source.stable_id,
+				event
+		)
+		if transition != null:
+			var target: State = states_by_id.get(transition.to_state_id)
 			if target == null or not target.enabled:
 				break
 			return _change_state(target, payload, event)
@@ -210,18 +188,15 @@ func get_context() -> Dictionary:
 	return _context
 
 
-## Creates a fresh runtime copy of the definition's context template.
+## Creates a fresh runtime copy of the Inspector context Dictionary.
 func reset_context() -> Dictionary:
-	_context = (
-		definition.context.duplicate(true)
-		if definition != null
-		else {}
-	)
+	_context = context.duplicate(true)
 	return _context
 
 
 func _set_state_manager(manager: Node) -> void:
 	state_manager = manager
+	_rebuild_state_registry()
 
 
 func _find_state_manager() -> Node:
@@ -231,15 +206,11 @@ func _find_state_manager() -> Node:
 	return null
 ## Returns {"errors": PackedStringArray, "warnings": PackedStringArray}.
 func validate() -> Dictionary:
+	_rebuild_state_registry()
 	var errors := PackedStringArray()
 	var warnings := PackedStringArray()
-	if definition == null:
-		errors.append("StateMachine has no definition resource.")
-		return {"errors": errors, "warnings": warnings}
-	errors.append_array(definition.get_structure_errors())
-	var all_states: Array[State] = definition.get_all_states()
-	var uids_seen: Dictionary[StringName, State] = {}
-	var scoped_names: Dictionary[String, State] = {}
+	var all_states: Array[State] = _get_all_states()
+	var ids_seen: Dictionary[StringName, State] = {}
 
 	if get_parent() is StateMachine:
 		errors.append(
@@ -247,65 +218,45 @@ func validate() -> Dictionary:
 		)
 
 	for state: State in all_states:
-		if state == null:
-			errors.append("Definition contains a null State.")
-			continue
-		if state.editor_uid.is_empty():
-			errors.append("State '%s' has no internal editor UID." % state.name)
-		elif uids_seen.has(state.editor_uid):
+		if state.stable_id.is_empty():
+			errors.append("State '%s' has an empty stable_id." % state.get_path())
+		elif ids_seen.has(state.stable_id):
 			errors.append(
-					"Duplicate internal editor UID on '%s' and '%s'."
+					"Duplicate stable_id '%s' on '%s' and '%s'."
 					% [
-						(uids_seen[state.editor_uid] as State).name,
-						state.name,
+						state.stable_id,
+						(ids_seen[state.stable_id] as State).get_path(),
+						state.get_path(),
 					]
 			)
 		else:
-			uids_seen[state.editor_uid] = state
-		if state.name.is_empty():
-			errors.append("Definition contains a State with an empty name.")
-		elif "/" in str(state.name):
-			errors.append("State name '%s' cannot contain '/'." % state.name)
-		var parent := definition.find_parent_state(state)
-		var scope_uid := parent.editor_uid if parent != null else &"root"
-		var scoped_key := "%s/%s" % [scope_uid, state.name]
-		if scoped_names.has(scoped_key):
-			errors.append(
-					"Scope contains more than one State named '%s'."
-					% state.name
-			)
-		else:
-			scoped_names[scoped_key] = state
+			ids_seen[state.stable_id] = state
 
-	if definition.initial_state.is_empty():
-		errors.append("Definition has no initial State.")
-	elif not _is_direct_child_name(null, definition.initial_state, false):
+	if initial_state_id.is_empty():
+		errors.append("StateMachine has no initial_state_id.")
+	elif not _is_direct_child_id(self, initial_state_id):
 		errors.append(
-				"Root initial state '%s' is not a root State."
-				% definition.initial_state
+				"Root initial state '%s' is not a direct child State."
+				% initial_state_id
 		)
 
 	for state: State in all_states:
 		var children: Array[State] = state.get_state_children()
 		if not children.is_empty():
-			if state.initial_child.is_empty():
+			if state.initial_child_id.is_empty():
 				errors.append(
-						"Compound state '%s' has no initial child."
-						% state.name
+						"Compound state '%s' has no initial_child_id."
+						% state.get_path()
 				)
-			elif not _is_direct_child_name(
-					state,
-					state.initial_child,
-					false
-			):
+			elif not _is_direct_child_id(state, state.initial_child_id):
 				errors.append(
 						"Initial child '%s' is not a direct child of '%s'."
-						% [state.initial_child, state.name]
+						% [state.initial_child_id, state.get_path()]
 				)
-		elif not state.initial_child.is_empty():
+		elif not state.initial_child_id.is_empty():
 			warnings.append(
-					"Leaf state '%s' has an unused initial child."
-					% state.name
+					"Leaf state '%s' has an unused initial_child_id."
+					% state.get_path()
 			)
 
 	_validate_transitions(errors, warnings)
@@ -398,10 +349,11 @@ func _expand_initial_children(path: Array[State]) -> Array[State]:
 	var result: Array[State] = path.duplicate()
 	var cursor: State = result.back()
 	while cursor.is_compound():
-		var initial_child := _find_direct_state_by_name(
-				cursor.get_state_children(),
-				cursor.initial_child
-		)
+		var initial_child: State = null
+		for child: State in cursor.get_state_children():
+			if child.stable_id == cursor.initial_child_id:
+				initial_child = child
+				break
 		if initial_child == null:
 			return []
 		result.append(initial_child)
@@ -412,29 +364,35 @@ func _expand_initial_children(path: Array[State]) -> Array[State]:
 func _resolve_state_reference(reference: Variant) -> State:
 	if reference is State:
 		var candidate := reference as State
-		if candidate.state_machine == self:
-			return candidate
-		return states_by_uid.get(candidate.editor_uid)
+		return candidate if candidate.state_machine == self else null
 
 	var text: String = str(reference).strip_edges().trim_prefix("/").trim_suffix("/")
 	if text.is_empty():
 		return null
+	var id := StringName(text)
+	if states_by_id.has(id):
+		return states_by_id[id]
+
 	var segments: PackedStringArray = text.split("/", false)
-	var candidates: Array[State] = _runtime_root_states
+	var scope: Node = self
 	var found: State = null
 	for segment: String in segments:
-		found = _find_direct_state_by_name(candidates, StringName(segment))
+		found = null
+		for child: Node in scope.get_children():
+			if child is State and (
+					child.name == StringName(segment)
+					or (child as State).stable_id == StringName(segment)
+			):
+				found = child as State
+				break
 		if found == null:
 			return null
-		candidates = found.get_state_children()
+		scope = found
 	return found
 
 
 func _rebuild_state_registry() -> void:
-	states_by_uid.clear()
-	_runtime_root_states.clear()
-	if definition == null:
-		return
+	states_by_id.clear()
 	var context_actor: Node = actor
 	if (
 		context_actor == null
@@ -444,35 +402,29 @@ func _rebuild_state_registry() -> void:
 		context_actor = state_manager.call(&"get_actor") as Node
 	if context_actor == null:
 		context_actor = get_parent()
-	for root_definition: State in definition.states:
-		if root_definition == null:
-			continue
-		var runtime_root := (
-				root_definition.duplicate_deep(
-						Resource.DEEP_DUPLICATE_ALL
-				) as State
-		)
-		if runtime_root == null:
-			continue
-		_runtime_root_states.append(runtime_root)
-		_register_state_tree(runtime_root, null, context_actor)
+	for child: Node in get_children():
+		if child is State:
+			_register_state_tree(child as State, null, context_actor)
 
 
 func _register_state_tree(
 		state: State,
 		parent: State,
-	context_actor: Node
+		context_actor: Node
 ) -> void:
 	state._set_runtime_context(self, parent, context_actor)
-	if not state.editor_uid.is_empty() and not states_by_uid.has(state.editor_uid):
-		states_by_uid[state.editor_uid] = state
+	if not state.stable_id.is_empty() and not states_by_id.has(state.stable_id):
+		states_by_id[state.stable_id] = state
 	for child: State in state.get_state_children():
-		if child != null:
-			_register_state_tree(child, state, context_actor)
+		_register_state_tree(child, state, context_actor)
 
 
 func _get_all_states() -> Array[State]:
-	return definition.get_all_states() if definition != null else []
+	var result: Array[State] = []
+	for child: Node in get_children():
+		if child is State:
+			_append_state_tree(child as State, result)
+	return result
 
 
 func _append_state_tree(state: State, result: Array[State]) -> void:
@@ -481,32 +433,11 @@ func _append_state_tree(state: State, result: Array[State]) -> void:
 		_append_state_tree(child, result)
 
 
-func _is_direct_child_name(
-		scope: State,
-		state_name: StringName,
-		runtime: bool = true
-) -> bool:
-	var children: Array[State]
-	if scope != null:
-		children = scope.get_state_children()
-	elif runtime:
-		children = _runtime_root_states
-	elif definition != null:
-		children = definition.get_direct_states()
-	for child: State in children:
-		if child != null and child.name == state_name:
+func _is_direct_child_id(scope: Node, state_id: StringName) -> bool:
+	for child: Node in scope.get_children():
+		if child is State and (child as State).stable_id == state_id:
 			return true
 	return false
-
-
-func _find_direct_state_by_name(
-		states: Array[State],
-		state_name: StringName
-) -> State:
-	for state: State in states:
-		if state != null and state.name == state_name:
-			return state
-	return null
 
 
 func _is_path_enabled(path: Array[State]) -> bool:
@@ -520,30 +451,70 @@ func _validate_transitions(
 		errors: PackedStringArray,
 		_warnings: PackedStringArray
 ) -> void:
-	for from_state: State in definition.get_all_states():
-		if from_state == null:
+	if graph == null:
+		errors.append("StateMachine has no graph resource.")
+		return
+
+	var transition_keys: Dictionary[String, StateTransition] = {}
+	for transition: StateTransition in graph.transitions:
+		if transition == null:
+			errors.append("Graph contains a null transition.")
 			continue
-		var scope: State = definition.find_parent_state(from_state)
-		var siblings := definition.get_direct_states(scope)
-		for event: StringName in from_state.transitions:
-			var target_name: StringName = from_state.transitions[event]
-			if event.is_empty():
+		if transition.event.is_empty():
+			errors.append("Transition '%s' has an empty event." % transition.id)
+
+		var scope: Node = self
+		if not transition.scope_id.is_empty():
+			scope = states_by_id.get(transition.scope_id)
+			if scope == null:
 				errors.append(
-						"State '%s' contains a transition with an empty event."
-						% from_state.name
-				)
-			if target_name.is_empty():
-				errors.append(
-						"Transition '%s' from '%s' has no target."
-						% [event, from_state.name]
+						"Transition '%s' references missing scope '%s'."
+						% [transition.id, transition.scope_id]
 				)
 				continue
-			var to_state := _find_direct_state_by_name(siblings, target_name)
-			if to_state == null:
-				errors.append(
-						"Transition '%s' from '%s' references missing target '%s'."
-						% [event, from_state.name, target_name]
-				)
+
+		var from_state: State = states_by_id.get(transition.from_state_id)
+		var to_state: State = states_by_id.get(transition.to_state_id)
+		if from_state == null:
+			errors.append(
+					"Transition '%s' references missing source '%s'."
+					% [transition.id, transition.from_state_id]
+			)
+		if to_state == null:
+			errors.append(
+					"Transition '%s' references missing target '%s'."
+					% [transition.id, transition.to_state_id]
+			)
+		if from_state == null or to_state == null:
+			continue
+
+		if not _is_direct_child_id(scope, from_state.stable_id):
+			errors.append(
+					"Transition '%s' source '%s' is not a direct child of its scope."
+					% [transition.id, from_state.stable_id]
+			)
+		if not _is_direct_child_id(scope, to_state.stable_id):
+			errors.append(
+					"Transition '%s' target '%s' is not a direct child of its scope."
+					% [transition.id, to_state.stable_id]
+			)
+
+		var key: String = "%s|%s|%s" % [
+			transition.scope_id,
+			transition.from_state_id,
+			transition.event,
+		]
+		if transition_keys.has(key):
+			errors.append(
+					"Duplicate event '%s' from state '%s' in scope '%s'."
+					% [
+						transition.event,
+						transition.from_state_id,
+						transition.scope_id,
+					]
+			)
+		else:
+			transition_keys[key] = transition
 
 
 func _report_validation(validation: Dictionary) -> bool:
@@ -554,35 +525,3 @@ func _report_validation(validation: Dictionary) -> bool:
 	for error: String in errors:
 		push_error("[StateMachine] %s" % error)
 	return errors.is_empty()
-
-
-func _ensure_definition() -> void:
-	if definition == null:
-		definition = StateMachineResource.new()
-
-
-func _connect_definition() -> void:
-	if (
-		definition != null
-		and not definition.changed.is_connected(_on_definition_changed)
-	):
-		definition.changed.connect(_on_definition_changed)
-
-
-func _disconnect_definition() -> void:
-	if (
-		definition != null
-		and definition.changed.is_connected(_on_definition_changed)
-	):
-		definition.changed.disconnect(_on_definition_changed)
-
-
-func _on_definition_changed() -> void:
-	update_configuration_warnings()
-
-
-func _get_configuration_warnings() -> PackedStringArray:
-	var validation := validate()
-	var result: PackedStringArray = validation["errors"]
-	result.append_array(validation["warnings"])
-	return result

@@ -1,10 +1,8 @@
 # GState
 
 GState is a lightweight, hierarchical, event-driven state machine addon for
-Godot 4. Each StateMachine Node references a portable
-`StateMachineResource` that stores context, the complete state tree, and graph
-layout. Each State owns a small event-to-target transition map. Save the
-resource as `.tres` to reuse the same definition across scenes.
+Godot 4. Its state hierarchy lives in the Scene Tree, while transitions are
+edited through a scope-based graph editor.
 
 - Nested and compound states
 - Multiple independent state machines per manager
@@ -12,9 +10,6 @@ resource as `.tres` to reuse the same definition across scenes.
 - Dictionary context shared by states in one machine
 - State lifecycle hooks and active-path queries
 - Graph editing with Undo/Redo support
-- Graph selections open in Godot's native Inspector
-- Definition New, Inspect, Save As, and Make Unique workflow
-- Inspector transition rows with Event fields and same-scope Target dropdowns
 
 ## Documentation
 

@@ -22,7 +22,10 @@ Example (Node2D)
 ├── Status (Label)
 └── StateManager
     └── Main (StateMachine)
-        └── definition = main_state_machine.tres
+        ├── Enabled
+        │   ├── Idle
+        │   └── Moving
+        └── Disabled
 ```
 
 Create a `StateManager` first. Select it, open the GState bottom panel, click
@@ -39,19 +42,6 @@ Select `Main` from the State Machine selector at the top of the panel:
 
 The first State in each scope automatically becomes its initial state. You can
 select another State and click `Set Initial` to change it.
-
-These operations edit `StateMachine.definition`; they do not create State
-scene children. The Definition row above the graph shows whether the Resource
-is embedded in the scene or saved as an external asset. Use `Save As...` to
-save it as `main_state_machine.tres`, then assign that asset to other
-StateMachine nodes to reuse it. Use `Make Unique` before changing one machine
-that currently shares a definition. Selecting a State in the graph opens that
-resource in Godot's Inspector. Selecting a transition opens its source State,
-where the transition map is stored.
-
-The State's `Transitions` property displays one row per connection with an
-Event field, a same-scope Target dropdown, and a delete button. Use
-`+ Add Transition` to configure connections without copying internal IDs.
 
 ## 3. Create transitions
 

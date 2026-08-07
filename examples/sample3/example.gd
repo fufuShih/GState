@@ -18,7 +18,7 @@ func _enter_tree() -> void:
 
 
 func _ready() -> void:
-	title_label.text = "GState Resource Context Example"
+	title_label.text = "GState Node Context Example"
 	help_label.text = (
 			"Space: start round / +%d score\n" % SCORE_GAIN
 			+ "Enter: finish round · N: next round · R: restart"
@@ -29,11 +29,6 @@ func _ready() -> void:
 	if not state_manager.start():
 		state_label.text = "GState failed to start — check Issues or Output"
 		return
-	if _get_session_context().is_empty():
-		state_label.text = "Session context is missing"
-		push_error("Example requires context entries in session_machine.tres.")
-		return
-
 	_refresh_ui()
 
 
@@ -72,9 +67,7 @@ func _start_round() -> bool:
 	if not session.send(&"start"):
 		return false
 	var context := _get_session_context()
-	if context.is_empty():
-		return false
-	context[&"round"] = int(context.get(&"round", 0)) + 1
+	context[&"round"] += 1
 	context[&"round_score"] = 0
 	context[&"last_gain"] = 0
 	_update_context_label(context)
@@ -85,10 +78,8 @@ func _add_score(amount: int) -> bool:
 	if not session.send(&"score", {"amount": amount}):
 		return false
 	var context := _get_session_context()
-	if context.is_empty():
-		return false
-	context[&"round_score"] = int(context.get(&"round_score", 0)) + amount
-	context[&"total_score"] = int(context.get(&"total_score", 0)) + amount
+	context[&"round_score"] += amount
+	context[&"total_score"] += amount
 	context[&"last_gain"] = amount
 	_update_context_label(context)
 	return true
@@ -96,9 +87,7 @@ func _add_score(amount: int) -> bool:
 
 func _refresh_ui() -> void:
 	_update_state_label(session.get_active_path())
-	var context := _get_session_context()
-	if not context.is_empty():
-		_update_context_label(context)
+	_update_context_label(_get_session_context())
 	_update_help_position.call_deferred()
 
 
@@ -115,16 +104,16 @@ func _update_state_label(path: Array[State]) -> void:
 
 func _update_context_label(context: Dictionary) -> void:
 	context_label.text = (
-			"SessionContext\n"
+			"Session Context\n"
 			+ "round: %d\n"
 			+ "round_score: %d\n"
 			+ "total_score: %d\n"
 			+ "last_gain: %d"
 	) % [
-		context.get(&"round", 0),
-		context.get(&"round_score", 0),
-		context.get(&"total_score", 0),
-		context.get(&"last_gain", 0),
+		context[&"round"],
+		context[&"round_score"],
+		context[&"total_score"],
+		context[&"last_gain"],
 	]
 	_update_help_position.call_deferred()
 

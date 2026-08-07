@@ -1,8 +1,6 @@
-[gd_scene load_steps=4 format=3]
+[gd_scene load_steps=2 format=3]
 
 [ext_resource type="Script" path="res://addons/gstate/editor/state_machine_editor.gd" id="1_editor"]
-[ext_resource type="Script" path="res://addons/gstate/editor/state_graph_canvas.gd" id="2_canvas"]
-[ext_resource type="Script" path="res://addons/gstate/editor/state_definition_toolbar.gd" id="3_definition_toolbar"]
 
 [node name="GStateMachineEditor" type="Control"]
 custom_minimum_size = Vector2(0, 400)
@@ -54,47 +52,6 @@ unique_name_in_owner = true
 layout_mode = 2
 tooltip_text = "Add a top-level StateMachine under this StateManager"
 text = "+ Machine"
-
-[node name="DefinitionRow" type="HBoxContainer" parent="Layout/Toolbar/Rows"]
-unique_name_in_owner = true
-layout_mode = 2
-theme_override_constants/separation = 6
-script = ExtResource("3_definition_toolbar")
-
-[node name="Label" type="Label" parent="Layout/Toolbar/Rows/DefinitionRow"]
-layout_mode = 2
-text = "Definition"
-
-[node name="DefinitionPath" type="Label" parent="Layout/Toolbar/Rows/DefinitionRow"]
-unique_name_in_owner = true
-layout_mode = 2
-size_flags_horizontal = 3
-text = "No StateMachine selected"
-text_overrun_behavior = 3
-
-[node name="InspectDefinitionButton" type="Button" parent="Layout/Toolbar/Rows/DefinitionRow"]
-unique_name_in_owner = true
-layout_mode = 2
-tooltip_text = "Open this StateMachineResource in Godot's Inspector"
-text = "Inspect"
-
-[node name="NewDefinitionButton" type="Button" parent="Layout/Toolbar/Rows/DefinitionRow"]
-unique_name_in_owner = true
-layout_mode = 2
-tooltip_text = "Replace the current definition with a new embedded Resource"
-text = "New"
-
-[node name="SaveDefinitionButton" type="Button" parent="Layout/Toolbar/Rows/DefinitionRow"]
-unique_name_in_owner = true
-layout_mode = 2
-tooltip_text = "Save this definition as a reusable .tres Resource"
-text = "Save As..."
-
-[node name="MakeUniqueButton" type="Button" parent="Layout/Toolbar/Rows/DefinitionRow"]
-unique_name_in_owner = true
-layout_mode = 2
-tooltip_text = "Duplicate this definition into an independent embedded Resource"
-text = "Make Unique"
 
 [node name="Navigation" type="HBoxContainer" parent="Layout/Toolbar/Rows"]
 layout_mode = 2
@@ -195,12 +152,10 @@ text = "Delete Transition"
 [node name="GraphEdit" type="GraphEdit" parent="Layout"]
 unique_name_in_owner = true
 layout_mode = 2
-size_flags_horizontal = 3
 size_flags_vertical = 3
 show_minimap_button = false
 minimap_enabled = false
 snapping_enabled = true
-script = ExtResource("2_canvas")
 
 [node name="EmptyHint" type="Label" parent="Layout/GraphEdit"]
 unique_name_in_owner = true
@@ -291,14 +246,3 @@ offset_right = 612.0
 offset_bottom = 314.0
 editable = false
 wrap_mode = 1
-
-[node name="ReplaceDefinitionDialog" type="ConfirmationDialog" parent="Layout/Toolbar/Rows/DefinitionRow"]
-unique_name_in_owner = true
-title = "Replace State Machine Definition?"
-dialog_text = "The current definition contains data. Replace it with a new empty embedded Resource?"
-ok_button_text = "Replace"
-
-[node name="ResourceErrorDialog" type="AcceptDialog" parent="Layout/Toolbar/Rows/DefinitionRow"]
-unique_name_in_owner = true
-title = "GState Resource Error"
-ok_button_text = "Close"

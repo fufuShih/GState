@@ -43,17 +43,8 @@ contains errors.
 state_machine.send(&"move")
 state_machine.send(&"damage", {"amount": 10})
 state_machine.travel("Grounded/Run")
-state_machine.travel(state_machine.definition.find_state("Grounded/Run"))
+state_machine.travel($StateManager/Movement/Grounded/Run)
 ```
-
-A transition is an entry on its source State:
-
-```gdscript
-idle.add_transition(&"move", run.name)
-```
-
-The hierarchy supplies its scope. The Inspector presents the target as a
-same-scope dropdown, while the `.tres` stores the readable State name.
 
 - `send()` searches the current active path for an event transition.
 - `payload` is passed to `enter()` and signals for that transition.
@@ -62,17 +53,16 @@ same-scope dropdown, while the `.tres` stores the readable State name.
 
 ### Context
 
-Context is a Dictionary stored in the reusable StateMachine Resource:
+Edit the `context` Dictionary directly in the StateMachine Inspector:
 
 ```gdscript
-state_machine.definition.context = {
+{
 	&"speed": 120.0,
 	&"direction": Vector2.ZERO,
 }
 ```
 
-You can edit the same `context` Dictionary from the Inspector. A State reads
-and writes the runtime copy directly:
+A State reads and writes the runtime copy directly:
 
 ```gdscript
 extends State
@@ -85,9 +75,9 @@ func enter(_previous_state: State, _payload: Variant = null) -> void:
 ```
 
 - Every State in one StateMachine receives the same runtime Dictionary.
-- Starting a stopped machine or calling `restart()` deep-copies the
-  definition's `context`, leaving the `.tres` template unchanged.
-- When `context` is empty, `get_context()` returns an empty Dictionary.
+- Starting a stopped machine or calling `restart()` deep-copies `context`,
+  leaving the Inspector defaults unchanged.
+- An empty `context` returns an empty Dictionary.
 - `reset_context()` explicitly creates a fresh runtime copy.
 - Runtime contexts are isolated between StateMachines.
 
@@ -95,16 +85,18 @@ func enter(_previous_state: State, _payload: Variant = null) -> void:
 
 ```gdscript
 var current: State = state_machine.get_current_state()
+var run: State = state_machine.get_state("Grounded/Run")
 var path: Array[State] = state_machine.get_active_path()
 var running: bool = state_machine.is_running()
 
 state_machine.is_in_state("Grounded")
 state_machine.is_in_state("Grounded/Run")
-state_machine.is_in_state(state_machine.definition.find_state(&"Grounded"))
+state_machine.is_in_state($StateManager/Movement/Grounded)
 ```
 
-`get_current_state()` returns the deepest State in the active path. It returns
-`null` when the machine has no active State.
+`get_state()` resolves a readable State name or nested path without exposing
+internal IDs. `get_current_state()` returns the deepest State in the active
+path, or `null` when the machine has no active State.
 
 ### Validation
 

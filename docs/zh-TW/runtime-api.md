@@ -42,17 +42,8 @@ state_machine.stop()
 state_machine.send(&"move")
 state_machine.send(&"damage", {"amount": 10})
 state_machine.travel("Grounded/Run")
-state_machine.travel(state_machine.definition.find_state("Grounded/Run"))
+state_machine.travel($StateManager/Movement/Grounded/Run)
 ```
-
-Transition 直接放在來源 State：
-
-```gdscript
-idle.add_transition(&"move", run.name)
-```
-
-來源與 Scope 都由 State 階層推導。Inspector 使用同 Scope Target 下拉
-選單，`.tres` 內則保存可讀的 State 名稱。
 
 - `send()` 根據目前 Active Path 搜尋 Event Transition。
 - `payload` 只在本次切換中傳給 `enter()` 與 Signal。
@@ -61,33 +52,31 @@ idle.add_transition(&"move", run.name)
 
 ### Context
 
-Context 是存放在可重用 StateMachine Resource 中的 Dictionary：
+Context 直接使用 `Dictionary`，可以在 StateMachine 的 Inspector 中設定初始值：
 
 ```gdscript
-state_machine.definition.context = {
-	&"speed": 120.0,
-	&"direction": Vector2.ZERO,
+context = {
+	"speed": 120.0,
+	"direction": Vector2.ZERO,
 }
 ```
 
-同一份 `context` 也能在 Inspector 中編輯。State script 取得 runtime
-copy 後即可直接讀寫：
+State script 取得後即可直接讀寫：
 
 ```gdscript
 extends State
 
 
 func enter(_previous_state: State, payload: Variant = null) -> void:
-	var context := get_context()
-	context[&"speed"] = 240.0
-	context[&"direction"] = Vector2.RIGHT
+	var machine_context := get_context()
+	machine_context["speed"] = 240.0
+	machine_context["direction"] = Vector2.RIGHT
 ```
 
 - 同一個 StateMachine 的所有 State 取得同一個 runtime Dictionary。
 - 從 stopped 狀態成功 `start()` 或呼叫 `restart()` 時，StateMachine
-  會 deep-copy definition 的 `context`，不會修改 `.tres` 中的範本。
-- 不需要 context 時可保持空 Dictionary，`get_context()` 會回傳空
-  Dictionary。
+  會深層複製 `context`，不會修改 Inspector 中的初始值。
+- 不需要 context 時保持空 Dictionary 即可。
 - `reset_context()` 可在執行中明確建立一份新的初始 context。
 - 不同 StateMachine 的 runtime context 彼此隔離。
 
@@ -95,16 +84,18 @@ func enter(_previous_state: State, payload: Variant = null) -> void:
 
 ```gdscript
 var current: State = state_machine.get_current_state()
+var run: State = state_machine.get_state("Grounded/Run")
 var path: Array[State] = state_machine.get_active_path()
 var running: bool = state_machine.is_running()
 
 state_machine.is_in_state("Grounded")
 state_machine.is_in_state("Grounded/Run")
-state_machine.is_in_state(state_machine.definition.find_state(&"Grounded"))
+state_machine.is_in_state($StateManager/Movement/Grounded)
 ```
 
-`get_current_state()` 回傳 Active Path 最深層的 State。沒有 Active State
-時回傳 `null`。
+`get_state()` 可用易讀的 State 名稱或巢狀路徑取得節點，不需要接觸內部
+ID。`get_current_state()` 回傳 Active Path 最深層的 State；沒有 Active
+State 時回傳 `null`。
 
 ### 驗證
 

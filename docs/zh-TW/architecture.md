@@ -2,12 +2,18 @@
 
 [文件索引](README.md) | [English](../en/architecture.md)
 
-GState 使用兩層場景 Node，加上一份可攜的 Resource 定義：
+GState 使用三層 Node：
 
 ```text
 StateManager
-├── Movement (StateMachine) → movement.tres
-└── Combat (StateMachine)   → combat.tres
+├── Movement (StateMachine)
+│   ├── Grounded (State)
+│   │   ├── Idle (State)
+│   │   └── Run (State)
+│   └── Airborne (State)
+└── Combat (StateMachine)
+	├── Peaceful (State)
+	└── Attacking (State)
 ```
 
 ## StateManager
@@ -31,20 +37,13 @@ StateMachine 不可以包含另一台 StateMachine。需要階層狀態時使用
 Nested State；需要另一條可以同時運作的狀態軸時，直接在 StateManager
 下增加另一台 StateMachine。
 
+每台 StateMachine 可直接在 Inspector 的 `context` Dictionary 設定共用資料。
+執行時會使用深層複本，因此重新啟動 Machine 就能恢復初始值。
+
 ## State
 
-State 是 `StateMachineResource` 中真正會進入、離開及更新的 Resource。
-State 的 `children` 包含其他 State 時會自動成為 Compound State。
-StateMachine 啟動時會深複製定義樹，所以多台 Machine 可以安全共用同一
-份 `.tres`。
-
-每個 State 也擁有自己的 `transitions` Dictionary：key 是 Event 名稱，
-value 是同一 Scope 內的目標 State 名稱。來源與 Scope 都能從 State
-階層推導，因此不用同步維護另一份 Transition 陣列或公開隨機 ID。
-
-`StateMachineResource.context` 是與 State 樹一起存進 `.tres` 的
-Dictionary。Machine 啟動時會 deep-copy；同一台 Machine 的 State 共用
-runtime copy，不同 Machine 之間則彼此隔離。
+State 是 StateMachine 中真正會進入、離開及更新的節點。State 底下包含
+State 時會自動成為 Compound State。
 
 簡單判斷方式：
 

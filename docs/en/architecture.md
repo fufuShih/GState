@@ -2,12 +2,18 @@
 
 [Documentation index](README.md) | [Traditional Chinese](../zh-TW/architecture.md)
 
-GState uses two scene-node levels plus one portable Resource definition:
+GState uses three levels of nodes:
 
 ```text
 StateManager
-├── Movement (StateMachine) → movement.tres
-└── Combat (StateMachine)   → combat.tres
+├── Movement (StateMachine)
+│   ├── Grounded (State)
+│   │   ├── Idle (State)
+│   │   └── Run (State)
+│   └── Airborne (State)
+└── Combat (StateMachine)
+    ├── Peaceful (State)
+    └── Attacking (State)
 ```
 
 ## StateManager
@@ -24,7 +30,7 @@ StateManager
 
 Each `StateMachine` is fully independent:
 
-- It owns its active path and isolated runtime context copy.
+- It owns its graph, initial state, active path, and runtime context.
 - Events are not automatically forwarded to other StateMachines.
 - It can be started, stopped, and assigned an actor independently.
 
@@ -34,13 +40,8 @@ StateMachine directly under the StateManager.
 
 ## State
 
-A `State` is a Resource that enters, exits, and receives updates. A State
-with entries in its `children` array is a compound state. StateMachine makes
-a deep runtime copy, so several machines can safely share one `.tres`.
-
-Each State also owns a `transitions` Dictionary. Its keys are event names and
-its values are sibling State names. The source and scope are inferred from the
-State, so there is no separate transition list or public random ID to manage.
+A `State` is the node that actually enters, exits, and receives updates. A
+State containing child States automatically becomes a compound state.
 
 A simple rule of thumb:
 
@@ -52,7 +53,7 @@ A state needs internal substates         → use nested states
 
 ## Context
 
-`StateMachineResource.context` is a Dictionary stored beside the State tree in
-the `.tres`. When a stopped machine starts, it deep-copies that Dictionary.
-Every State in the machine receives the same runtime Dictionary through
-`get_context()`, while different machines remain isolated.
+`StateMachine.context` is a Dictionary edited directly in the Inspector.
+When a stopped machine starts, it creates a deep runtime copy. Every State in
+the machine receives that same live Dictionary through `get_context()`, while
+different machines remain isolated.

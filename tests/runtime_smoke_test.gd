@@ -14,17 +14,6 @@ func _initialize() -> void:
 
 
 func _run() -> void:
-	RecordingState.calls = _calls
-	var session_definition := load(
-			"res://examples/sample3/session_machine.tres"
-	) as StateMachineResource
-	var serialized_playing := session_definition.find_state(&"Playing")
-	_expect(
-		session_definition.initial_state == &"Idle"
-		and serialized_playing != null
-		and serialized_playing.transitions[&"finish"] == &"Result",
-		"serialized resources use readable State names"
-	)
 	var host := Node.new()
 	host.name = &"Player"
 	var manager := StateManager.new()
@@ -38,26 +27,20 @@ func _run() -> void:
 		&"speed": 120.0,
 		&"stats": {&"energy": 3},
 	}
-	machine.definition.context = movement_context
+	machine.context = movement_context
 	manager.add_child(machine)
 
 	var ui_machine := StateMachine.new()
 	ui_machine.name = &"UI"
 	ui_machine.autostart = false
 	var ui_context: Dictionary = {&"screen": &"menu"}
-	ui_machine.definition.context = ui_context
+	ui_machine.context = ui_context
 	manager.add_child(ui_machine)
 	var menu_closed := State.new()
 	menu_closed.name = &"Closed"
-	menu_closed.editor_uid = &"editor_closed"
-	ui_machine.definition.add_state(menu_closed)
-	ui_machine.definition.initial_state = menu_closed.name
-
-	var shared_machine := StateMachine.new()
-	shared_machine.name = &"MovementCopy"
-	shared_machine.autostart = false
-	shared_machine.definition = machine.definition
-	manager.add_child(shared_machine)
+	menu_closed.stable_id = &"closed"
+	ui_machine.add_child(menu_closed)
+	ui_machine.initial_state_id = menu_closed.stable_id
 
 	var grounded := _add_state(machine, &"Grounded", &"grounded")
 	var idle := _add_state(grounded, &"Idle", &"idle")
@@ -67,9 +50,9 @@ func _run() -> void:
 	var fall := _add_state(airborne, &"Fall", &"fall")
 	var dead := _add_state(machine, &"Dead", &"dead")
 
-	machine.definition.initial_state = grounded.name
-	grounded.initial_child = idle.name
-	airborne.initial_child = jump.name
+	machine.initial_state_id = grounded.stable_id
+	grounded.initial_child_id = idle.stable_id
+	airborne.initial_child_id = jump.stable_id
 
 	_add_transition(machine, grounded, airborne, &"jump")
 	_add_transition(machine, airborne, grounded, &"land")
@@ -78,13 +61,6 @@ func _run() -> void:
 	_add_transition(machine, idle, run, &"move", grounded)
 	_add_transition(machine, run, idle, &"stop", grounded)
 	_add_transition(machine, jump, fall, &"falling", airborne)
-	idle.name = &"Resting"
-	_expect(
-		grounded.initial_child == &"Resting"
-		and run.transitions[&"stop"] == &"Resting",
-		"renaming a State updates initial and incoming same-scope references"
-	)
-	idle.name = &"Idle"
 
 	get_root().add_child(host)
 	await process_frame
@@ -92,47 +68,35 @@ func _run() -> void:
 	var valid_result: Dictionary = machine.validate()
 	var valid_errors: PackedStringArray = valid_result["errors"]
 	_expect(valid_errors.is_empty(), "valid graph must pass validation")
-	_expect(manager.get_state_machines().size() == 3, "manager owns three machines")
+	_expect(manager.get_state_machines().size() == 2, "manager owns two machines")
 	_expect(manager.get_machine(&"Movement") == machine, "manager finds machine")
 	_expect(manager.get_machine(&"UI") == ui_machine, "manager finds second machine")
 	_expect(machine.start(), "start() must succeed")
 	_expect(ui_machine.start(), "second independent machine starts")
-	_expect(shared_machine.start(), "shared definition starts independently")
-	_expect(
-		machine.get_current_state() != shared_machine.get_current_state()
-		and not grounded.active,
-		"shared .tres creates isolated runtime States"
-	)
 	_expect_path(machine, "Grounded/Idle")
-	_expect(
-		machine.get_state(&"Grounded").actor == host,
-		"State actor defaults through StateManager"
-	)
-	_expect(
-		ui_machine.get_state(&"Closed").actor == host,
-		"manager shares its actor with child machines"
-	)
+	_expect(grounded.actor == host, "State actor defaults through StateManager")
+	_expect(menu_closed.actor == host, "manager shares its actor with child machines")
 	var runtime_context := machine.get_context()
-	var state_context := machine.get_state(&"Grounded").get_context()
+	var state_context := grounded.get_context()
 	var runtime_ui_context := ui_machine.get_context()
-	var shared_context := shared_machine.get_context()
 	_expect(
-		runtime_context.get(&"speed") == 120.0,
-		"start duplicates the definition context Dictionary"
+		runtime_context[&"speed"] == 120.0
+		and not is_same(runtime_context, movement_context),
+		"start duplicates the Inspector context Dictionary"
 	)
 	_expect(
-		state_context == runtime_context,
-		"every State reads the same live context Resource"
+		is_same(state_context, runtime_context),
+		"every State reads the same live context Dictionary"
 	)
 	_expect(
-		runtime_ui_context.get(&"screen") == &"menu"
-		and runtime_ui_context != runtime_context,
+		runtime_ui_context[&"screen"] == &"menu"
+		and not is_same(runtime_ui_context, runtime_context),
 		"independent machines have isolated contexts"
 	)
 
 	runtime_context[&"speed"] = 240.0
 	(runtime_context[&"stats"] as Dictionary)[&"energy"] = 7
-	var run_context := machine.get_state("Grounded/Run").get_context()
+	var run_context := run.get_context()
 	_expect(
 		run_context[&"speed"] == 240.0
 		and (run_context[&"stats"] as Dictionary)[&"energy"] == 7,
@@ -141,12 +105,7 @@ func _run() -> void:
 	_expect(
 		movement_context[&"speed"] == 120.0
 		and (movement_context[&"stats"] as Dictionary)[&"energy"] == 3,
-		"runtime writes do not mutate the definition context Dictionary"
-	)
-	_expect(
-		shared_context[&"speed"] == 120.0
-		and (shared_context[&"stats"] as Dictionary)[&"energy"] == 3,
-		"machines sharing one .tres keep isolated runtime contexts"
+		"runtime writes do not mutate the Inspector context Dictionary"
 	)
 
 	_calls.clear()
@@ -182,6 +141,7 @@ func _run() -> void:
 
 	_expect(machine.travel("Grounded/Run"), "travel to nested path")
 	_expect_path(machine, "Grounded/Run")
+	_expect(machine.get_state("Grounded/Run") == run, "get_state resolves Node paths")
 	_expect(machine.is_in_state(grounded), "compound State reference is active")
 	_expect(machine.is_in_state("Grounded"), "compound path is active")
 	_expect(not machine.is_in_state("Grounded/Idle"), "inactive leaf is rejected")
@@ -190,29 +150,15 @@ func _run() -> void:
 	_expect_path(machine, "Grounded/Idle")
 	var restarted_context := machine.get_context()
 	_expect(
-		restarted_context != previous_context
+		not is_same(restarted_context, previous_context)
 		and restarted_context[&"speed"] == 120.0
 		and (restarted_context[&"stats"] as Dictionary)[&"energy"] == 3,
-		"restart restores the definition context"
+		"restart restores the Inspector context"
 	)
 
 	var graph_view: GStateMachineEditor = StateMachineEditorScene.instantiate()
 	get_root().add_child(graph_view)
 	graph_view.set_state_manager(manager)
-	_expect(
-		graph_view.find_child("InspectorPanel", true, false) == null,
-		"Graph Editor relies on Godot's native Inspector"
-	)
-	_expect(
-		graph_view.find_child("DefinitionPath", true, false) != null
-		and graph_view.find_child(
-				"SaveDefinitionButton",
-				true,
-				false
-		) != null
-		and graph_view.find_child("MakeUniqueButton", true, false) != null,
-		"Graph Editor exposes the Definition resource workflow"
-	)
 	_expect(
 		_count_graph_nodes(graph_view) == 3,
 		"root graph view displays direct child states"
@@ -223,13 +169,6 @@ func _run() -> void:
 	)
 	var grounded_graph_node := _find_graph_node(graph_view, grounded)
 	var dead_graph_node := _find_graph_node(graph_view, dead)
-	_expect(
-		grounded_graph_node != null
-		and _get_graph_edit(graph_view).get_state_for_node(
-				grounded_graph_node.name
-		) == grounded,
-		"Graph Canvas owns State node lookup data"
-	)
 	_expect(
 		grounded_graph_node != null
 		and grounded_graph_node.get_output_port_count() == 2,
@@ -271,15 +210,13 @@ func _run() -> void:
 		"State IN rows remain numbered"
 	)
 	var long_event := &"this_transition_event_name_must_stay_complete"
-	var long_transition: Dictionary = {
-		&"source": grounded,
-		&"source_uid": grounded.editor_uid,
-		&"target_uid": dead.editor_uid,
-		&"target_name": dead.name,
-		&"event": long_event,
-	}
-	var long_outgoing: Array[Dictionary] = [long_transition]
-	var no_incoming: Array[Dictionary] = []
+	var long_transition := StateTransition.new(
+			grounded.stable_id,
+			dead.stable_id,
+			long_event
+	)
+	var long_outgoing: Array[StateTransition] = [long_transition]
+	var no_incoming: Array[StateTransition] = []
 	var preview_node := GStateGraphNode.new()
 	preview_node.setup(grounded, false, long_outgoing, no_incoming)
 	var preview_port_row := preview_node.get_child(2) as HBoxContainer
@@ -300,42 +237,25 @@ func _run() -> void:
 	)
 	graph_view.queue_free()
 
-	var resource_machine := StateMachine.new()
-	resource_machine.definition.context = {&"speed": 10.0}
-	var resource_state := State.new()
-	resource_state.name = &"Ready"
-	resource_machine.definition.add_state(resource_state)
-	var original_definition := resource_machine.definition
-	var resource_editor: GStateMachineEditor = (
-		StateMachineEditorScene.instantiate()
+	var duplicate := StateTransition.new(
+			idle.stable_id,
+			run.stable_id,
+			&"move",
+			grounded.stable_id
 	)
-	get_root().add_child(resource_editor)
-	resource_editor.set_state_machine(resource_machine)
-	var definition_toolbar := resource_editor.get_node("%DefinitionRow")
-	definition_toolbar._make_definition_unique()
-	_expect(
-		resource_machine.definition != original_definition
-		and resource_machine.definition.states.size() == 1
-		and resource_machine.definition.states[0] != resource_state,
-		"Make Unique deep-copies the complete definition"
+	machine.graph.add_transition(duplicate)
+	var cross_scope := StateTransition.new(
+			run.stable_id,
+			airborne.stable_id,
+			&"launch",
+			grounded.stable_id
 	)
-	definition_toolbar._replace_with_new_definition()
-	_expect(
-		resource_machine.definition.states.is_empty()
-		and resource_machine.definition.context.is_empty()
-		and original_definition.states.size() == 1,
-		"New Definition replaces without mutating the previous Resource"
-	)
-	resource_editor.queue_free()
-	resource_machine.free()
-
-	idle.transitions[&""] = run.name
-	idle.transitions[&"launch"] = airborne.name
+	machine.graph.add_transition(cross_scope)
 	var invalid_result: Dictionary = machine.validate()
 	var invalid_errors: PackedStringArray = invalid_result["errors"]
 	_expect(
 		not invalid_errors.is_empty(),
-		"empty transition event must fail validation"
+		"duplicate source event must fail validation"
 	)
 	_expect(
 		invalid_errors.size() >= 2,
@@ -344,11 +264,9 @@ func _run() -> void:
 
 	machine.stop()
 	ui_machine.stop()
-	shared_machine.stop()
 	_expect(not machine.is_running(), "stop() clears running state")
 	_expect(machine.get_active_path().is_empty(), "stop() clears active path")
 	host.queue_free()
-	await process_frame
 
 	if _failures.is_empty():
 		print("GState runtime smoke test: PASS")
@@ -363,28 +281,32 @@ func _run() -> void:
 		quit(1)
 
 
-func _add_state(parent: Variant, state_name: StringName, id: StringName) -> State:
+func _add_state(parent: Node, state_name: StringName, id: StringName) -> State:
 	var state: State = RecordingState.new()
 	state.name = state_name
-	state.editor_uid = StringName("editor_%s" % id)
-	if parent is StateMachine:
-		(parent as StateMachine).definition.add_state(state)
-	elif parent is State:
-		(parent as State).add_child_state(state)
+	state.stable_id = id
+	state.calls = _calls
+	parent.add_child(state)
 	return state
 
 
 func _add_transition(
-		_machine: StateMachine,
+		machine: StateMachine,
 		from_state: State,
 		to_state: State,
 		event: StringName,
-		_scope: State = null
+		scope: State = null
 ) -> void:
-	_expect(
-		from_state.add_transition(event, to_state.name),
-		"transition must be added to its source State"
+	var scope_id := StateTransition.ROOT_SCOPE_ID
+	if scope != null:
+		scope_id = scope.stable_id
+	var transition := StateTransition.new(
+			from_state.stable_id,
+			to_state.stable_id,
+			event,
+			scope_id
 	)
+	_expect(machine.graph.add_transition(transition), "transition must be added")
 
 
 func _expect_path(machine: StateMachine, expected: String) -> void:
@@ -398,8 +320,8 @@ func _expect_calls(expected: Array[String], label: String) -> void:
 	_expect(_calls == expected, "%s: got %s" % [label, _calls])
 
 
-func _get_graph_edit(editor: GStateMachineEditor):
-	return editor.get_node("%GraphEdit")
+func _get_graph_edit(editor: GStateMachineEditor) -> GraphEdit:
+	return editor.get_node("%GraphEdit") as GraphEdit
 
 
 func _count_graph_nodes(editor: GStateMachineEditor) -> int:
