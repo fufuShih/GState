@@ -1,0 +1,61 @@
+[gd_resource type="Resource" script_class="StateMachineResource" load_steps=9 format=3]
+
+[ext_resource type="Script" uid="uid://k8cysnueqmdq" path="res://addons/gstate/runtime/state_machine_resource.gd" id="1"]
+[ext_resource type="Script" uid="uid://bkmlfi4nsituu" path="res://addons/gstate/runtime/state.gd" id="2"]
+[ext_resource type="Script" uid="uid://cmc34giy7r8q4" path="res://addons/gstate/runtime/state_transition.gd" id="3"]
+
+[sub_resource type="Resource" id="Idle"]
+script = ExtResource("2")
+stable_id = &"state_30933b671d07d9b5"
+name = &"Idle"
+
+[sub_resource type="Resource" id="Playing"]
+script = ExtResource("2")
+stable_id = &"state_217ff1bf897ae801"
+name = &"Playing"
+
+[sub_resource type="Resource" id="Result"]
+script = ExtResource("2")
+stable_id = &"state_26a92f3194c32c09"
+name = &"Result"
+
+[sub_resource type="Resource" id="T1"]
+script = ExtResource("3")
+id = &"transition_7670bd50e7c755f4"
+from_state_id = &"state_30933b671d07d9b5"
+to_state_id = &"state_217ff1bf897ae801"
+event = &"start"
+
+[sub_resource type="Resource" id="T2"]
+script = ExtResource("3")
+id = &"transition_4f41d4bfda41a2cd"
+from_state_id = &"state_217ff1bf897ae801"
+to_state_id = &"state_217ff1bf897ae801"
+event = &"score"
+
+[sub_resource type="Resource" id="T3"]
+script = ExtResource("3")
+id = &"transition_635c98c3fc8e9c4f"
+from_state_id = &"state_217ff1bf897ae801"
+to_state_id = &"state_26a92f3194c32c09"
+event = &"finish"
+
+[sub_resource type="Resource" id="T4"]
+script = ExtResource("3")
+id = &"transition_6e9ca322a9caa76c"
+from_state_id = &"state_26a92f3194c32c09"
+to_state_id = &"state_30933b671d07d9b5"
+event = &"next_round"
+
+[resource]
+script = ExtResource("1")
+initial_state_id = &"state_30933b671d07d9b5"
+states = Array[ExtResource("2")]([SubResource("Idle"), SubResource("Playing"), SubResource("Result")])
+transitions = Array[ExtResource("3")]([SubResource("T1"), SubResource("T2"), SubResource("T3"), SubResource("T4")])
+editor_positions = {
+&"state_217ff1bf897ae801": Vector2(1121.2382, 116.38379),
+&"state_26a92f3194c32c09": Vector2(1240.8688, 466.8223),
+&"state_30933b671d07d9b5": Vector2(399.64615, 203.31282)
+}
+editor_scroll = Vector2(0, 36.439163)
+editor_zoom = 0.38554305

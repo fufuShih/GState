@@ -1,6 +1,6 @@
 extends State
 
-var calls: Array[String] = []
+static var calls: Array[String] = []
 
 
 func enter(_previous_state: State, _payload: Variant = null) -> void:

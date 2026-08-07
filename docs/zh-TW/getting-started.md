@@ -22,10 +22,7 @@ Example (Node2D)
 ├── Status (Label)
 └── StateManager
 	└── Main (StateMachine)
-		├── Enabled
-		│   ├── Idle
-		│   └── Moving
-		└── Disabled
+		└── definition = main_state_machine.tres
 ```
 
 先建立 `StateManager`。選取它後，在底部 GState 面板點
@@ -42,6 +39,15 @@ Example (Node2D)
 
 每個 Scope 的第一個 State 會自動成為 Initial State，也可以選取 State
 後按 `Set Initial` 修改。
+
+所有操作都會寫入 `StateMachine.definition`，不會在 Main 底下建立
+State 子節點。選取 Main 後，可在 Inspector 展開 Definition，使用資源
+選單的 **Save As** 存成 `main_state_machine.tres`。其他場景只要把同一
+份資源指派給 StateMachine，就能共用相同定義；每台 Machine 的 runtime
+State 仍會各自複製，不會互相污染。
+
+Graph 右側 Inspector 會依選取內容顯示 State 或 Transition 屬性。選取
+State 時也會列出同一 Scope 中可以合法連線的目標。
 
 ## 3. 建立 Transition
 

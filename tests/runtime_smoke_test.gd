@@ -15,6 +15,7 @@ func _initialize() -> void:
 
 
 func _run() -> void:
+	RecordingState.calls = _calls
 	var host := Node.new()
 	host.name = &"Player"
 	var manager := StateManager.new()
@@ -40,8 +41,14 @@ func _run() -> void:
 	var menu_closed := State.new()
 	menu_closed.name = &"Closed"
 	menu_closed.stable_id = &"closed"
-	ui_machine.add_child(menu_closed)
+	ui_machine.definition.add_state(menu_closed)
 	ui_machine.initial_state_id = menu_closed.stable_id
+
+	var shared_machine := StateMachine.new()
+	shared_machine.name = &"MovementCopy"
+	shared_machine.autostart = false
+	shared_machine.definition = machine.definition
+	manager.add_child(shared_machine)
 
 	var grounded := _add_state(machine, &"Grounded", &"grounded")
 	var idle := _add_state(grounded, &"Idle", &"idle")
@@ -69,16 +76,30 @@ func _run() -> void:
 	var valid_result: Dictionary = machine.validate()
 	var valid_errors: PackedStringArray = valid_result["errors"]
 	_expect(valid_errors.is_empty(), "valid graph must pass validation")
-	_expect(manager.get_state_machines().size() == 2, "manager owns two machines")
+	_expect(manager.get_state_machines().size() == 3, "manager owns three machines")
 	_expect(manager.get_machine(&"Movement") == machine, "manager finds machine")
 	_expect(manager.get_machine(&"UI") == ui_machine, "manager finds second machine")
 	_expect(machine.start(), "start() must succeed")
 	_expect(ui_machine.start(), "second independent machine starts")
+	_expect(shared_machine.start(), "shared definition starts independently")
+	_expect(
+		machine.get_current_state() != shared_machine.get_current_state()
+		and not grounded.active,
+		"shared .tres creates isolated runtime States"
+	)
 	_expect_path(machine, "Grounded/Idle")
-	_expect(grounded.actor == host, "State actor defaults through StateManager")
-	_expect(menu_closed.actor == host, "manager shares its actor with child machines")
+	_expect(
+		machine.get_state(grounded.stable_id).actor == host,
+		"State actor defaults through StateManager"
+	)
+	_expect(
+		ui_machine.get_state(menu_closed.stable_id).actor == host,
+		"manager shares its actor with child machines"
+	)
 	var runtime_context := machine.get_context() as RecordingContext
-	var state_context := grounded.get_context() as RecordingContext
+	var state_context := (
+		machine.get_state(grounded.stable_id).get_context() as RecordingContext
+	)
 	var runtime_ui_context := ui_machine.get_context() as RecordingContext
 	_expect(
 		runtime_context != null
@@ -99,7 +120,9 @@ func _run() -> void:
 
 	runtime_context.speed = 240.0
 	runtime_context.stats[&"energy"] = 7
-	var run_context := run.get_context() as RecordingContext
+	var run_context := (
+		machine.get_state(run.stable_id).get_context() as RecordingContext
+	)
 	_expect(
 		run_context.speed == 240.0
 		and run_context.stats[&"energy"] == 7,
@@ -266,9 +289,11 @@ func _run() -> void:
 
 	machine.stop()
 	ui_machine.stop()
+	shared_machine.stop()
 	_expect(not machine.is_running(), "stop() clears running state")
 	_expect(machine.get_active_path().is_empty(), "stop() clears active path")
 	host.queue_free()
+	await process_frame
 
 	if _failures.is_empty():
 		print("GState runtime smoke test: PASS")
@@ -283,12 +308,14 @@ func _run() -> void:
 		quit(1)
 
 
-func _add_state(parent: Node, state_name: StringName, id: StringName) -> State:
+func _add_state(parent: Variant, state_name: StringName, id: StringName) -> State:
 	var state: State = RecordingState.new()
 	state.name = state_name
 	state.stable_id = id
-	state.calls = _calls
-	parent.add_child(state)
+	if parent is StateMachine:
+		(parent as StateMachine).definition.add_state(state)
+	elif parent is State:
+		(parent as State).add_child_state(state)
 	return state
 
 

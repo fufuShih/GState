@@ -30,6 +30,9 @@ const FALLBACK_COLUMNS := 3
 @onready var _refresh_button: Button = %RefreshButton
 @onready var _graph_edit: GraphEdit = %GraphEdit
 @onready var _empty_hint: Label = %EmptyHint
+@onready var _inspector_title: Label = %InspectorTitle
+@onready var _connectable_targets: Label = %ConnectableTargets
+@onready var _inspector_host: VBoxContainer = %InspectorHost
 @onready var _transition_dialog: ConfirmationDialog = %TransitionDialog
 @onready var _event_edit: LineEdit = %EventEdit
 @onready var _transition_error: Label = %TransitionError
@@ -46,14 +49,18 @@ var _selected_state: State
 var _pending_from_state: State
 var _pending_to_state: State
 var _editing_transition: StateTransition
+var _selected_transition: StateTransition
 var _renaming_state: State
 var _undo_redo: EditorUndoRedoManager
 var _editor_interface: EditorInterface
+var _context_inspector: EditorInspector
 var _node_names_by_state_id: Dictionary[StringName, StringName] = {}
 var _states_by_node_name: Dictionary[StringName, State] = {}
 var _graph_nodes_by_state_id: Dictionary[StringName, GStateGraphNode] = {}
 var _positions_before_move: Dictionary = {}
 var _observed_scene_nodes: Array[Node] = []
+var _observed_state_resources: Array[State] = []
+var _observed_definition: StateMachineResource
 var _refreshing: bool = false
 var _refresh_queued: bool = false
 var _syncing_editor_selection: bool = false
@@ -78,8 +85,22 @@ func _ready() -> void:
 	_rename_dialog.confirmed.connect(_confirm_state_rename)
 	_state_name_edit.text_changed.connect(_validate_state_name)
 	_configure_graph_edit()
+	if Engine.is_editor_hint():
+		_context_inspector = EditorInspector.create_default_inspector()
+		_context_inspector.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		_context_inspector.property_edited.connect(
+				_on_inspector_property_edited
+		)
+		_inspector_host.add_child(_context_inspector)
 	_show_placeholder()
 	_update_action_buttons()
+
+
+func _exit_tree() -> void:
+	_disconnect_graph_resource()
+	_disconnect_scene_observers()
+	if _context_inspector != null:
+		_context_inspector.edit(null)
 
 
 func _process(_delta: float) -> void:
@@ -135,6 +156,7 @@ func _change_state_machine(machine: StateMachine) -> void:
 	_state_machine = machine
 	_scope = null
 	_selected_state = null
+	_selected_transition = null
 	_connect_graph_resource()
 	_rebuild_machine_selector()
 	refresh()
@@ -147,8 +169,29 @@ func edit_state(machine: StateMachine, state: State) -> void:
 		set_state_machine(machine)
 	if not _belongs_to_machine(state):
 		return
-	_scope = state.get_parent() as State
+	_scope = machine.definition.find_parent_state(state)
 	_selected_state = state
+	refresh()
+
+
+func edit_resource_object(resource: Resource) -> void:
+	if _state_machine == null or _state_machine.definition == null:
+		return
+	if resource == _state_machine.definition:
+		_selected_state = null
+		_selected_transition = null
+	elif resource is State and _belongs_to_machine(resource as State):
+		var state := resource as State
+		_scope = _get_state_parent(state)
+		_selected_state = state
+		_selected_transition = null
+	elif resource is StateTransition and (
+			_state_machine.definition.transitions.has(resource)
+	):
+		_selected_state = null
+		_selected_transition = resource as StateTransition
+	else:
+		return
 	refresh()
 
 
@@ -189,7 +232,7 @@ func refresh() -> void:
 		_selected_state = null
 	elif (
 		not _belongs_to_machine(_selected_state)
-		or _selected_state.get_parent() != _get_scope_parent()
+		or _get_state_parent(_selected_state) != _scope
 	):
 		_selected_state = null
 
@@ -267,7 +310,9 @@ func refresh() -> void:
 	_update_scope_summary(states)
 	_update_empty_hint(states)
 	_update_action_buttons()
+	_update_context_inspector()
 	_rebuild_scene_observers()
+	_connect_graph_resource()
 	_refreshing = false
 
 
@@ -387,31 +432,35 @@ func _add_child_state() -> void:
 	_create_state(_selected_state, true)
 
 
-func _create_state(parent: Node, enter_child_scope: bool) -> void:
-	if parent == null or _undo_redo == null or _editor_interface == null:
+func _create_state(parent: Variant, enter_child_scope: bool) -> void:
+	if _state_machine == null or _undo_redo == null:
 		return
 	_ensure_graph()
 	var state := State.new()
 	state.name = &"NewState"
-	var scene_root: Node = _editor_interface.get_edited_scene_root()
-	if scene_root == null:
-		return
-
-	var initial_owner: Object = _state_machine if parent == _state_machine else parent
+	var state_owner: Object = (
+			parent as State
+			if parent is State
+			else _state_machine.definition
+	)
+	var states_property := &"children" if parent is State else &"states"
+	var old_states: Array[State] = _get_direct_state_children(parent)
+	var new_states: Array[State] = old_states.duplicate()
+	new_states.append(state)
+	var initial_owner: Object = state_owner
 	var initial_property := (
 			&"initial_state_id"
-			if parent == _state_machine
+			if parent == null
 			else &"initial_child_id"
 	)
 	var old_initial: StringName = initial_owner.get(initial_property)
-	var should_set_initial: bool = _get_direct_state_children(parent).is_empty()
+	var should_set_initial := old_states.is_empty()
 	var position := _graph_edit.scroll_offset + (
 			_graph_edit.size * 0.5 / _graph_edit.zoom
 	)
 
 	_undo_redo.create_action("GState: Add State")
-	_undo_redo.add_do_method(parent, &"add_child", state, true)
-	_undo_redo.add_do_property(state, &"owner", scene_root)
+	_undo_redo.add_do_property(state_owner, states_property, new_states)
 	_undo_redo.add_do_reference(state)
 	if should_set_initial:
 		_undo_redo.add_do_property(
@@ -429,7 +478,7 @@ func _create_state(parent: Node, enter_child_scope: bool) -> void:
 			self,
 			&"_after_state_added",
 			state,
-			parent if enter_child_scope else null
+			parent as State if enter_child_scope and parent is State else null
 	)
 
 	_undo_redo.add_undo_method(
@@ -443,12 +492,12 @@ func _create_state(parent: Node, enter_child_scope: bool) -> void:
 				initial_property,
 				old_initial
 		)
-	_undo_redo.add_undo_method(parent, &"remove_child", state)
+	_undo_redo.add_undo_property(state_owner, states_property, old_states)
 	_undo_redo.add_undo_method(
 			self,
 			&"_after_added_state_removed",
 			state,
-			parent
+			parent as State if parent is State else null
 	)
 	_undo_redo.commit_action()
 	call_deferred(&"_open_state_rename", state)
@@ -461,13 +510,13 @@ func _after_state_added(state: State, child_scope: State) -> void:
 	refresh()
 
 
-func _after_added_state_removed(state: State, parent: Node) -> void:
+func _after_added_state_removed(state: State, parent: State) -> void:
 	if (
 		_scope == parent
-		and parent is State
-		and not (parent as State).is_compound()
+		and parent != null
+		and not parent.is_compound()
 	):
-		_scope = parent.get_parent() as State
+		_scope = _get_state_parent(parent)
 	if _selected_state == state or _is_ancestor_state(state, _selected_state):
 		_selected_state = null
 	refresh()
@@ -497,12 +546,11 @@ func _validate_state_name(text: String) -> void:
 	elif state_name.validate_node_name() != state_name:
 		error = "The name contains characters that Godot does not allow."
 	elif is_instance_valid(_renaming_state):
-		var parent: Node = _renaming_state.get_parent()
-		if parent != null:
-			for child: Node in parent.get_children():
-				if child != _renaming_state and str(child.name) == state_name:
-					error = "A sibling already uses this name."
-					break
+		var parent := _get_state_parent(_renaming_state)
+		for child: State in _get_direct_state_children(parent):
+			if child != _renaming_state and str(child.name) == state_name:
+				error = "A sibling already uses this name."
+				break
 	_rename_error.text = error
 	_rename_dialog.get_ok_button().disabled = not error.is_empty()
 
@@ -531,7 +579,9 @@ func _set_selected_initial() -> void:
 func _set_initial_state(state: State) -> void:
 	if not is_instance_valid(state) or _undo_redo == null:
 		return
-	var owner: Object = _state_machine if _scope == null else _scope
+	var owner: Object = (
+			_state_machine.definition if _scope == null else _scope
+	)
 	var property := (
 			&"initial_state_id" if _scope == null else &"initial_child_id"
 	)
@@ -550,12 +600,15 @@ func _delete_selected_state() -> void:
 	if not is_instance_valid(_selected_state) or _undo_redo == null:
 		return
 	var state: State = _selected_state
-	var parent: Node = state.get_parent()
-	if parent == null:
-		return
+	var parent := _get_state_parent(state)
+	var state_owner: Object = (
+			parent if parent != null else _state_machine.definition
+	)
+	var states_property := &"children" if parent != null else &"states"
+	var old_states := _get_direct_state_children(parent)
+	var new_states: Array[State] = old_states.duplicate()
+	new_states.erase(state)
 	_ensure_graph()
-	var scene_root: Node = _editor_interface.get_edited_scene_root()
-	var state_index: int = state.get_index()
 	var removed_ids: Dictionary[StringName, bool] = {}
 	_collect_state_ids(state, removed_ids)
 
@@ -580,19 +633,20 @@ func _delete_selected_state() -> void:
 		new_positions.erase(id)
 
 	var initial_owner: Object = (
-			_state_machine if parent == _state_machine else parent
+			parent if parent != null else _state_machine.definition
 	)
 	var initial_property := (
 			&"initial_state_id"
-			if parent == _state_machine
+			if parent == null
 			else &"initial_child_id"
 	)
 	var old_initial: StringName = initial_owner.get(initial_property)
 	var new_initial: StringName = old_initial
 	if removed_ids.has(old_initial):
-		new_initial = _find_replacement_initial(parent, state)
+		new_initial = new_states[0].stable_id if not new_states.is_empty() else &""
 
 	_undo_redo.create_action("GState: Delete State")
+	_undo_redo.add_do_property(state_owner, states_property, new_states)
 	_undo_redo.add_do_property(
 			_state_machine.graph,
 			&"transitions",
@@ -604,17 +658,10 @@ func _delete_selected_state() -> void:
 			new_positions
 	)
 	_undo_redo.add_do_property(initial_owner, initial_property, new_initial)
-	_undo_redo.add_do_method(self, &"_remove_existing_state", parent, state)
+	_undo_redo.add_do_method(self, &"_after_state_deleted", state, parent)
 	_undo_redo.add_do_method(self, &"refresh")
 
-	_undo_redo.add_undo_method(
-			self,
-			&"_restore_existing_state",
-			parent,
-			state,
-			state_index,
-			scene_root
-	)
+	_undo_redo.add_undo_property(state_owner, states_property, old_states)
 	_undo_redo.add_undo_property(initial_owner, initial_property, old_initial)
 	_undo_redo.add_undo_property(
 			_state_machine.graph,
@@ -631,25 +678,11 @@ func _delete_selected_state() -> void:
 	_undo_redo.commit_action()
 
 
-func _remove_existing_state(parent: Node, state: State) -> void:
+func _after_state_deleted(state: State, parent: State) -> void:
 	if _scope == state or _is_ancestor_state(state, _scope):
-		_scope = parent as State
+		_scope = parent
 	if _selected_state == state or _is_ancestor_state(state, _selected_state):
 		_selected_state = null
-	if state.get_parent() == parent:
-		parent.remove_child(state)
-
-
-func _restore_existing_state(
-		parent: Node,
-		state: State,
-		index: int,
-		scene_root: Node
-) -> void:
-	if state.get_parent() == null:
-		parent.add_child(state)
-		parent.move_child(state, mini(index, parent.get_child_count() - 1))
-	_set_owner_recursive(state, scene_root)
 
 
 func _request_transition(
@@ -793,6 +826,7 @@ func _delete_selected_transition() -> void:
 	)
 	if transition == null:
 		return
+	_selected_transition = null
 	_undo_redo.create_action("GState: Delete Transition")
 	_undo_redo.add_do_method(
 			_state_machine.graph,
@@ -820,7 +854,9 @@ func _on_graph_node_selected(node: Node) -> void:
 		return
 	if node is GStateGraphNode:
 		_selected_state = (node as GStateGraphNode).state
+		_selected_transition = null
 		_update_action_buttons()
+		_update_context_inspector()
 		_select_state_in_editor.call_deferred(_selected_state)
 
 
@@ -833,20 +869,24 @@ func _on_graph_node_deselected(node: Node) -> void:
 	):
 		_selected_state = null
 		_update_action_buttons()
+		_update_context_inspector()
 
 
-func _select_state_in_editor(node: Node) -> void:
+func _select_state_in_editor(object: Object) -> void:
 	if (
 		_editor_interface == null
-		or not is_instance_valid(node)
+		or not is_instance_valid(object)
 		or _syncing_editor_selection
 	):
 		return
 	_syncing_editor_selection = true
-	var selection: EditorSelection = _editor_interface.get_selection()
-	selection.clear()
-	selection.add_node(node)
-	_editor_interface.edit_node(node)
+	if object is Node:
+		var selection: EditorSelection = _editor_interface.get_selection()
+		selection.clear()
+		selection.add_node(object as Node)
+		_editor_interface.edit_node(object as Node)
+	elif object is Resource:
+		_editor_interface.edit_resource(object as Resource)
 	_syncing_editor_selection = false
 
 
@@ -925,7 +965,7 @@ func _show_scope(state: State) -> void:
 func _go_to_parent_scope() -> void:
 	if _scope == null:
 		return
-	_show_scope(_scope.get_parent() as State)
+	_show_scope(_get_state_parent(_scope))
 
 
 func _rebuild_breadcrumb() -> void:
@@ -941,10 +981,10 @@ func _rebuild_breadcrumb() -> void:
 		return
 
 	var scope_path: Array[State] = []
-	var cursor: Node = _scope
+	var cursor: State = _scope
 	while cursor is State:
 		scope_path.push_front(cursor as State)
-		cursor = cursor.get_parent()
+		cursor = _get_state_parent(cursor as State)
 	for state: State in scope_path:
 		var separator := Label.new()
 		separator.text = "›"
@@ -988,25 +1028,75 @@ func _rebuild_transition_options(
 func _on_transition_selected(_index: int) -> void:
 	_delete_transition_button.disabled = _transition_option.item_count == 0
 	_edit_transition_button.disabled = _transition_option.item_count == 0
+	_selected_state = null
+	_selected_transition = (
+		_transition_option.get_item_metadata(_transition_option.selected)
+		as StateTransition
+		if _transition_option.item_count > 0
+		else null
+	)
 	_update_action_buttons()
+	_update_context_inspector()
+
+
+func _update_context_inspector() -> void:
+	if _context_inspector == null:
+		return
+	var target: Object = _state_machine
+	_inspector_title.text = "State Machine"
+	_connectable_targets.text = (
+			"Assign or save Definition as a .tres resource to reuse this graph."
+	)
+	if is_instance_valid(_selected_state):
+		target = _selected_state
+		_inspector_title.text = "State · %s" % _selected_state.name
+		var parent := _get_state_parent(_selected_state)
+		var names := PackedStringArray()
+		for candidate: State in _get_direct_state_children(parent):
+			if candidate != null:
+				names.append(str(candidate.name))
+		_connectable_targets.text = (
+			"Can connect to (same scope): %s" % ", ".join(names)
+		)
+	elif is_instance_valid(_selected_transition):
+		var transition := _selected_transition
+		if transition != null:
+			target = transition
+			_inspector_title.text = "Transition · %s" % transition.event
+			var from_state := _find_state_by_id(transition.from_state_id)
+			var to_state := _find_state_by_id(transition.to_state_id)
+			_connectable_targets.text = "%s → %s" % [
+				from_state.name if from_state != null else transition.from_state_id,
+				to_state.name if to_state != null else transition.to_state_id,
+			]
+	_context_inspector.edit(target)
+
+
+func _on_inspector_property_edited(_property: String) -> void:
+	if _state_machine == null or _state_machine.definition == null:
+		return
+	var target := _context_inspector.get_edited_object()
+	if target is Resource:
+		(target as Resource).emit_changed()
+	_state_machine.definition.emit_changed()
+	_mark_scene_unsaved()
+	_queue_scene_refresh()
 
 
 func _get_scope_states() -> Array[State]:
 	return _get_direct_state_children(_get_scope_parent())
 
 
-func _get_direct_state_children(parent: Node) -> Array[State]:
-	var states: Array[State] = []
-	if parent == null:
-		return states
-	for child: Node in parent.get_children():
-		if child is State:
-			states.append(child as State)
-	return states
+func _get_direct_state_children(parent: Variant) -> Array[State]:
+	if _state_machine == null or _state_machine.definition == null:
+		return []
+	if parent is State:
+		return (parent as State).get_state_children()
+	return _state_machine.definition.get_direct_states()
 
 
-func _get_scope_parent() -> Node:
-	return _scope if _scope != null else _state_machine
+func _get_scope_parent() -> Variant:
+	return _scope
 
 
 func _get_scope_id() -> StringName:
@@ -1144,7 +1234,7 @@ func _get_scope_exit_events() -> PackedStringArray:
 	var result := PackedStringArray()
 	if _scope == null or _state_machine.graph == null:
 		return result
-	var parent_state := _scope.get_parent() as State
+	var parent_state := _get_state_parent(_scope)
 	var parent_scope_id := (
 			parent_state.stable_id
 			if parent_state != null
@@ -1241,37 +1331,29 @@ func _update_action_buttons() -> void:
 
 
 func _ensure_graph() -> void:
-	if _state_machine.graph == null:
-		_state_machine.graph = StateMachineGraph.new()
+	if _state_machine.definition == null:
+		_state_machine.definition = StateMachineResource.new()
 		_connect_graph_resource()
 		_mark_scene_unsaved()
 
 
 func _mark_scene_unsaved() -> void:
-	if _editor_interface != null:
+	if _editor_interface == null:
+		return
+	if _state_machine != null and _state_machine.definition != null:
+		_editor_interface.set_object_edited(_state_machine.definition, true)
+	if (
+		_state_machine == null
+		or _state_machine.definition == null
+		or _state_machine.definition.is_built_in()
+	):
 		_editor_interface.mark_scene_as_unsaved()
-
-
-func _find_replacement_initial(parent: Node, removed: State) -> StringName:
-	for child: Node in parent.get_children():
-		if child is State and child != removed:
-			return (child as State).stable_id
-	return &""
 
 
 func _find_state_by_id(state_id: StringName) -> State:
 	if _state_machine == null:
 		return null
-	var pending: Array[Node] = [_state_machine]
-	while not pending.is_empty():
-		var parent: Node = pending.pop_back()
-		for child: Node in parent.get_children():
-			if child is State:
-				var state := child as State
-				if state.stable_id == state_id:
-					return state
-				pending.append(state)
-	return null
+	return _state_machine.definition.find_state(state_id)
 
 
 func _collect_state_ids(
@@ -1283,20 +1365,14 @@ func _collect_state_ids(
 		_collect_state_ids(child, result)
 
 
-func _set_owner_recursive(node: Node, owner: Node) -> void:
-	node.owner = owner
-	for child: Node in node.get_children():
-		_set_owner_recursive(child, owner)
-
-
 func _is_ancestor_state(ancestor: State, state: State) -> bool:
 	if not is_instance_valid(ancestor) or not is_instance_valid(state):
 		return false
-	var cursor: Node = state.get_parent()
+	var cursor: State = _get_state_parent(state)
 	while cursor is State:
 		if cursor == ancestor:
 			return true
-		cursor = cursor.get_parent()
+		cursor = _get_state_parent(cursor)
 	return false
 
 
@@ -1309,13 +1385,6 @@ func _rebuild_scene_observers() -> void:
 	if _state_machine == null:
 		return
 	_observe_scene_node(_state_machine)
-	var pending: Array[Node] = [_state_machine]
-	while not pending.is_empty():
-		var parent: Node = pending.pop_back()
-		for child: Node in parent.get_children():
-			if child is State:
-				_observe_scene_node(child)
-				pending.append(child)
 
 
 func _observe_scene_node(node: Node) -> void:
@@ -1328,6 +1397,10 @@ func _observe_scene_node(node: Node) -> void:
 		node.child_order_changed.connect(_queue_scene_refresh)
 	if not node.tree_exiting.is_connected(_queue_scene_refresh):
 		node.tree_exiting.connect(_queue_scene_refresh)
+	if node is StateMachine and not node.definition_changed.is_connected(
+			_on_machine_definition_changed
+	):
+		node.definition_changed.connect(_on_machine_definition_changed)
 
 
 func _disconnect_scene_observers() -> void:
@@ -1340,6 +1413,10 @@ func _disconnect_scene_observers() -> void:
 			node.child_order_changed.disconnect(_queue_scene_refresh)
 		if node.tree_exiting.is_connected(_queue_scene_refresh):
 			node.tree_exiting.disconnect(_queue_scene_refresh)
+		if node is StateMachine and node.definition_changed.is_connected(
+				_on_machine_definition_changed
+		):
+			node.definition_changed.disconnect(_on_machine_definition_changed)
 	_observed_scene_nodes.clear()
 
 
@@ -1356,25 +1433,63 @@ func _run_queued_refresh() -> void:
 
 
 func _belongs_to_machine(state: State) -> bool:
-	var cursor: Node = state
-	while cursor != null and cursor is State:
-		cursor = cursor.get_parent()
-	return cursor == _state_machine
+	return (
+		_state_machine != null
+		and _state_machine.definition != null
+		and _state_machine.definition.contains_state(state)
+	)
+
+
+func _get_state_parent(state: State) -> State:
+	if _state_machine == null or _state_machine.definition == null:
+		return null
+	return _state_machine.definition.find_parent_state(state)
 
 
 func _connect_graph_resource() -> void:
+	_observed_definition = (
+			_state_machine.definition if _state_machine != null else null
+	)
 	if (
-		_state_machine != null
-		and _state_machine.graph != null
-		and not _state_machine.graph.changed.is_connected(refresh)
+		_observed_definition != null
+		and not _observed_definition.changed.is_connected(
+				_on_graph_resource_changed
+		)
 	):
-		_state_machine.graph.changed.connect(refresh)
+		_observed_definition.changed.connect(_on_graph_resource_changed)
+	if _state_machine != null and _state_machine.definition != null:
+		for state: State in _state_machine.definition.get_all_states():
+			if state != null and not state.changed.is_connected(_on_state_changed):
+				state.changed.connect(_on_state_changed)
+				_observed_state_resources.append(state)
 
 
 func _disconnect_graph_resource() -> void:
+	for state: State in _observed_state_resources:
+		if is_instance_valid(state) and state.changed.is_connected(_on_state_changed):
+			state.changed.disconnect(_on_state_changed)
+	_observed_state_resources.clear()
 	if (
-		_state_machine != null
-		and _state_machine.graph != null
-		and _state_machine.graph.changed.is_connected(refresh)
+		_observed_definition != null
+		and _observed_definition.changed.is_connected(
+				_on_graph_resource_changed
+		)
 	):
-		_state_machine.graph.changed.disconnect(refresh)
+		_observed_definition.changed.disconnect(_on_graph_resource_changed)
+	_observed_definition = null
+
+
+func _on_state_changed() -> void:
+	_mark_scene_unsaved()
+	_queue_scene_refresh()
+
+
+func _on_graph_resource_changed() -> void:
+	_mark_scene_unsaved()
+	_queue_scene_refresh()
+
+
+func _on_machine_definition_changed() -> void:
+	_disconnect_graph_resource()
+	_connect_graph_resource()
+	_queue_scene_refresh()

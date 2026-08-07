@@ -149,15 +149,21 @@ layout_mode = 2
 tooltip_text = "Delete the selected transition"
 text = "Delete Transition"
 
-[node name="GraphEdit" type="GraphEdit" parent="Layout"]
+[node name="Workspace" type="HSplitContainer" parent="Layout"]
+layout_mode = 2
+size_flags_vertical = 3
+split_offset = -330
+
+[node name="GraphEdit" type="GraphEdit" parent="Layout/Workspace"]
 unique_name_in_owner = true
 layout_mode = 2
+size_flags_horizontal = 3
 size_flags_vertical = 3
 show_minimap_button = false
 minimap_enabled = false
 snapping_enabled = true
 
-[node name="EmptyHint" type="Label" parent="Layout/GraphEdit"]
+[node name="EmptyHint" type="Label" parent="Layout/Workspace/GraphEdit"]
 unique_name_in_owner = true
 layout_mode = 1
 anchors_preset = 8
@@ -177,6 +183,28 @@ theme_override_font_sizes/font_size = 18
 text = "No states yet\nClick + State Here to create the initial state"
 horizontal_alignment = 1
 vertical_alignment = 1
+
+[node name="InspectorPanel" type="VBoxContainer" parent="Layout/Workspace"]
+custom_minimum_size = Vector2(310, 0)
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="InspectorTitle" type="Label" parent="Layout/Workspace/InspectorPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "State Machine"
+
+[node name="ConnectableTargets" type="Label" parent="Layout/Workspace/InspectorPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.63, 0.72, 0.82, 1)
+text = "Select a State to see valid targets."
+autowrap_mode = 2
+
+[node name="InspectorHost" type="VBoxContainer" parent="Layout/Workspace/InspectorPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
 
 [node name="TransitionDialog" type="ConfirmationDialog" parent="."]
 unique_name_in_owner = true

@@ -1,56 +1,21 @@
 [gd_scene format=3 uid="uid://uwkxa7lc1pfo"]
 
-[ext_resource type="Script" uid="uid://bgj8cl13jkfpq" path="res://examples/simple_example.gd" id="1_am6mk"]
-[ext_resource type="Script" uid="uid://b6iwt8dhfr5ua" path="res://addons/gstate/runtime/state_manager.gd" id="1_gsnlg"]
-[ext_resource type="Script" uid="uid://i50by6xe6v2e" path="res://addons/gstate/runtime/state_machine.gd" id="3_jsd8r"]
-[ext_resource type="Script" uid="uid://58h5uoomsyew" path="res://addons/gstate/runtime/state_machine_graph.gd" id="4_5t84k"]
-[ext_resource type="Script" uid="uid://cmc34giy7r8q4" path="res://addons/gstate/runtime/state_transition.gd" id="5_sgedn"]
-[ext_resource type="Script" uid="uid://bkmlfi4nsituu" path="res://addons/gstate/runtime/state.gd" id="6_ddhtx"]
-
-[sub_resource type="Resource" id="Resource_n48b5"]
-script = ExtResource("5_sgedn")
-id = &"transition_cf8f3b5f06e7fbd"
-from_state_id = &"state_6d506d46f665a06d"
-to_state_id = &"state_71b3c14ca3624acf"
-event = &"toggle"
-
-[sub_resource type="Resource" id="Resource_eewct"]
-script = ExtResource("5_sgedn")
-id = &"transition_e3578c62f008b6f"
-from_state_id = &"state_71b3c14ca3624acf"
-to_state_id = &"state_6d506d46f665a06d"
-event = &"toggle"
-
-[sub_resource type="Resource" id="Resource_76tag"]
-script = ExtResource("4_5t84k")
-transitions = Array[ExtResource("5_sgedn")]([SubResource("Resource_n48b5"), SubResource("Resource_eewct")])
-editor_positions = {
-&"state_6d506d46f665a06d": Vector2(1146, 212.5),
-&"state_71b3c14ca3624acf": Vector2(1646.7601, 275.61993)
-}
-editor_scroll = Vector2(-289.8595, 1.6493835)
-editor_zoom = 0.5900986
+[ext_resource type="Script" uid="uid://bgj8cl13jkfpq" path="res://examples/simple_example.gd" id="1_example"]
+[ext_resource type="Script" uid="uid://b6iwt8dhfr5ua" path="res://addons/gstate/runtime/state_manager.gd" id="2_manager"]
+[ext_resource type="Script" uid="uid://i50by6xe6v2e" path="res://addons/gstate/runtime/state_machine.gd" id="3_machine"]
+[ext_resource type="Resource" path="res://examples/simple_toggle_machine.tres" id="4_definition"]
 
 [node name="SimpleExample" type="Node2D" unique_id=230095197]
-script = ExtResource("1_am6mk")
+script = ExtResource("1_example")
 
 [node name="StatusLabel" type="Label" parent="." unique_id=901185193]
 offset_right = 40.0
 offset_bottom = 23.0
 
 [node name="StateManager" type="Node" parent="." unique_id=1801307802]
-script = ExtResource("1_gsnlg")
+script = ExtResource("2_manager")
 metadata/_custom_type_script = "uid://b6iwt8dhfr5ua"
 
 [node name="Toggle" type="Node" parent="StateManager" unique_id=1722555597]
-script = ExtResource("3_jsd8r")
-initial_state_id = &"state_6d506d46f665a06d"
-graph = SubResource("Resource_76tag")
-
-[node name="Off" type="Node" parent="StateManager/Toggle" unique_id=634687582]
-script = ExtResource("6_ddhtx")
-stable_id = &"state_6d506d46f665a06d"
-
-[node name="On" type="Node" parent="StateManager/Toggle" unique_id=936574815]
-script = ExtResource("6_ddhtx")
-stable_id = &"state_71b3c14ca3624acf"
+script = ExtResource("3_machine")
+definition = ExtResource("4_definition")

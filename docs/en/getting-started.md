@@ -22,10 +22,7 @@ Example (Node2D)
 ├── Status (Label)
 └── StateManager
     └── Main (StateMachine)
-        ├── Enabled
-        │   ├── Idle
-        │   └── Moving
-        └── Disabled
+        └── definition = main_state_machine.tres
 ```
 
 Create a `StateManager` first. Select it, open the GState bottom panel, click
@@ -42,6 +39,12 @@ Select `Main` from the State Machine selector at the top of the panel:
 
 The first State in each scope automatically becomes its initial state. You can
 select another State and click `Set Initial` to change it.
+
+These operations edit `StateMachine.definition`; they do not create State
+scene children. Select Main, then use Definition's resource menu in the
+Inspector to save it as `main_state_machine.tres`. Assign that asset to other
+StateMachine nodes to reuse it. The Graph-side Inspector edits the selected
+State or Transition and lists valid same-scope connection targets.
 
 ## 3. Create transitions
 

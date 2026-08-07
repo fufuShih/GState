@@ -31,9 +31,12 @@ func _exit_tree() -> void:
 
 
 func _handles(object: Object) -> bool:
-	return object is StateManager or object is StateMachine or (
-			object is State
-			and _find_state_machine(object as State) != null
+	return (
+		object is StateManager
+		or object is StateMachine
+		or object is StateMachineResource
+		or object is State
+		or object is StateTransition
 	)
 
 
@@ -44,11 +47,8 @@ func _edit(object: Object) -> void:
 		_state_machine_editor.set_state_manager(object as StateManager)
 	elif object is StateMachine:
 		_state_machine_editor.set_state_machine(object as StateMachine)
-	elif object is State:
-		var state := object as State
-		var machine := _find_state_machine(state)
-		if machine != null:
-			_state_machine_editor.edit_state(machine, state)
+	elif object is Resource:
+		_state_machine_editor.edit_resource_object(object as Resource)
 
 
 func _make_visible(visible: bool) -> void:
@@ -60,10 +60,3 @@ func _make_visible(visible: bool) -> void:
 	else:
 		_state_machine_editor.clear_editor()
 		hide_bottom_panel()
-
-
-func _find_state_machine(state: State) -> StateMachine:
-	var cursor: Node = state.get_parent()
-	while cursor is State:
-		cursor = cursor.get_parent()
-	return cursor as StateMachine

@@ -7,6 +7,7 @@
 [ext_resource type="Script" uid="uid://cmc34giy7r8q4" path="res://addons/gstate/runtime/state_transition.gd" id="4_wqi00"]
 [ext_resource type="Script" uid="uid://bkmlfi4nsituu" path="res://addons/gstate/runtime/state.gd" id="5_r37dv"]
 [ext_resource type="Resource" path="res://examples/sample3/session_context.tres" id="6_context"]
+[ext_resource type="Resource" path="res://examples/sample3/session_machine.tres" id="7_definition"]
 
 [sub_resource type="Resource" id="Resource_jdqt4"]
 script = ExtResource("4_wqi00")
@@ -42,10 +43,10 @@ transitions = Array[ExtResource("4_wqi00")]([SubResource("Resource_jdqt4"), SubR
 editor_positions = {
 &"state_217ff1bf897ae801": Vector2(1121.2382, 116.38379),
 &"state_26a92f3194c32c09": Vector2(1240.8688, 466.8223),
-&"state_30933b671d07d9b5": Vector2(399.64615, 203.31282),
+&"state_30933b671d07d9b5": Vector2(399.64615, 203.31282)
 }
-editor_scroll = Vector2(-9.901245, 31.258331)
-editor_zoom = 0.51315784
+editor_scroll = Vector2(0, 36.439163)
+editor_zoom = 0.38554305
 
 [node name="Example" type="Node2D" unique_id=1287871559]
 script = ExtResource("1_xmsfn")
@@ -78,18 +79,5 @@ metadata/_custom_type_script = "uid://b6iwt8dhfr5ua"
 [node name="Session" type="Node" parent="StateManager" unique_id=414219371]
 script = ExtResource("2_xmsfn")
 initial_context = ExtResource("6_context")
-initial_state_id = &"state_30933b671d07d9b5"
-graph = SubResource("Resource_2orfb")
+definition = ExtResource("7_definition")
 metadata/_custom_type_script = "uid://i50by6xe6v2e"
-
-[node name="Idle" type="Node" parent="StateManager/Session" unique_id=1211668674]
-script = ExtResource("5_r37dv")
-stable_id = &"state_30933b671d07d9b5"
-
-[node name="Playing" type="Node" parent="StateManager/Session" unique_id=1641799057]
-script = ExtResource("5_r37dv")
-stable_id = &"state_217ff1bf897ae801"
-
-[node name="Result" type="Node" parent="StateManager/Session" unique_id=218654947]
-script = ExtResource("5_r37dv")
-stable_id = &"state_26a92f3194c32c09"

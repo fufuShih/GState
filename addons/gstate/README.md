@@ -16,9 +16,9 @@ To leave a nested scope, create an outgoing transition from its compound State
 in the parent scope. No End or Final node is required.
 
 GState is a hierarchical, event-driven state machine plugin for Godot, inspired
-by XState. Its runtime and Graph Editor currently use GDScript. The public nodes
-are `StateManager`, `StateMachine`, and `State`; transitions live in the
-`StateMachineGraph` resource.
+by XState. Its runtime and Graph Editor currently use GDScript. The public scene
+nodes are `StateManager` and `StateMachine`; a portable
+`StateMachineResource` stores State resources, transitions, and graph metadata.
 
 ## Scene structure
 
@@ -110,13 +110,13 @@ refuses to run when errors are present.
 
 ## Graph Editor
 
-Enable the `GState` plugin, then select a `StateManager`, `StateMachine`, or
-`State` in the Scene Tree. A small selector chooses the active machine; the graph
+Enable the `GState` plugin, then select a `StateManager` or `StateMachine`
+in the Scene Tree. A small selector chooses the active machine; the graph
 below it displays only that machine's current State scope:
 
 - Use the machine selector to switch between independent machines.
 - `+ Machine` creates a StateMachine directly under StateManager.
-- Root shows direct children of `StateMachine`.
+- Root shows root State resources in `StateMachine.definition`.
 - Double-click a compound state to inspect its direct children.
 - Use the breadcrumb to return to any parent scope.
 - Initial states are marked with a dot.
@@ -130,14 +130,13 @@ below it displays only that machine's current State scope:
   multiple transitions on one State no longer overlap on a single point.
 - Edit or delete the transition selected in the transition list.
 - Delete selected States and their descendant graph data.
-- Dragging nodes saves their positions in `StateMachineGraph`.
+- Dragging nodes saves their positions in `StateMachineResource`.
 - Nodes only begin dragging from the titlebar after a short movement threshold.
 - State, transition, initial, and position edits support Undo/Redo.
-- Selecting a graph node also selects it in the Scene Tree and Inspector.
-- Selecting a State in the Scene Tree opens its parent graph scope.
-- Scene Tree rename, add, remove, and reorder operations refresh automatically.
+- Selecting a graph node opens its Resource properties in the Inspector.
+- The Graph-side Inspector shows State, Transition, and valid same-scope targets.
 - Validation issues can be opened from the `Issues` button.
 
-The Refresh button reloads state names and hierarchy changes from the Scene
-Tree. Scene hierarchy remains the source of truth; graph transitions and view
-metadata are serialized in `StateMachineGraph`.
+The complete hierarchy, transitions, and view metadata are serialized in
+`StateMachineResource`. Save `StateMachine.definition` as `.tres` to share
+it across scenes or projects.

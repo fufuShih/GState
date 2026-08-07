@@ -42,7 +42,7 @@ state_machine.stop()
 state_machine.send(&"move")
 state_machine.send(&"damage", {"amount": 10})
 state_machine.travel("Grounded/Run")
-state_machine.travel($StateManager/Movement/Grounded/Run)
+state_machine.travel(state_machine.definition.find_state(&"run"))
 ```
 
 - `send()` 根據目前 Active Path 搜尋 Event Transition。
@@ -92,7 +92,7 @@ var running: bool = state_machine.is_running()
 
 state_machine.is_in_state("Grounded")
 state_machine.is_in_state("Grounded/Run")
-state_machine.is_in_state($StateManager/Movement/Grounded)
+state_machine.is_in_state(state_machine.definition.find_state(&"grounded"))
 ```
 
 `get_current_state()` 回傳 Active Path 最深層的 State。沒有 Active State

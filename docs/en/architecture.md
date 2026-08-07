@@ -2,18 +2,12 @@
 
 [Documentation index](README.md) | [Traditional Chinese](../zh-TW/architecture.md)
 
-GState uses three levels of nodes:
+GState uses two scene-node levels plus one portable Resource definition:
 
 ```text
 StateManager
-├── Movement (StateMachine)
-│   ├── Grounded (State)
-│   │   ├── Idle (State)
-│   │   └── Run (State)
-│   └── Airborne (State)
-└── Combat (StateMachine)
-    ├── Peaceful (State)
-    └── Attacking (State)
+├── Movement (StateMachine) → movement.tres
+└── Combat (StateMachine)   → combat.tres
 ```
 
 ## StateManager
@@ -40,8 +34,9 @@ StateMachine directly under the StateManager.
 
 ## State
 
-A `State` is the node that actually enters, exits, and receives updates. A
-State containing child States automatically becomes a compound state.
+A `State` is a Resource that enters, exits, and receives updates. A State
+with entries in its `children` array is a compound state. StateMachine makes
+a deep runtime copy, so several machines can safely share one `.tres`.
 
 A simple rule of thumb:
 

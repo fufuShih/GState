@@ -2,18 +2,12 @@
 
 [文件索引](README.md) | [English](../en/architecture.md)
 
-GState 使用三層 Node：
+GState 使用兩層場景 Node，加上一份可攜的 Resource 定義：
 
 ```text
 StateManager
-├── Movement (StateMachine)
-│   ├── Grounded (State)
-│   │   ├── Idle (State)
-│   │   └── Run (State)
-│   └── Airborne (State)
-└── Combat (StateMachine)
-	├── Peaceful (State)
-	└── Attacking (State)
+├── Movement (StateMachine) → movement.tres
+└── Combat (StateMachine)   → combat.tres
 ```
 
 ## StateManager
@@ -39,8 +33,10 @@ Nested State；需要另一條可以同時運作的狀態軸時，直接在 Stat
 
 ## State
 
-State 是 StateMachine 中真正會進入、離開及更新的節點。State 底下包含
-State 時會自動成為 Compound State。
+State 是 `StateMachineResource` 中真正會進入、離開及更新的 Resource。
+State 的 `children` 包含其他 State 時會自動成為 Compound State。
+StateMachine 啟動時會深複製定義樹，所以多台 Machine 可以安全共用同一
+份 `.tres`。
 
 簡單判斷方式：
 
