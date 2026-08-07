@@ -4,7 +4,8 @@ English | [Traditional Chinese](../zh-TW/README.md)
 
 GState is a hierarchical, event-driven state machine addon for Godot. Each
 `StateMachine` Node references a portable `StateMachineResource` containing
-State resources, transitions, and Graph Editor metadata.
+context, State resources, and Graph Editor metadata. Each State stores its own
+outgoing event-to-target transition map.
 
 ## Documentation
 
@@ -24,9 +25,10 @@ State resources, transitions, and Graph Editor metadata.
 - Event lookup from the deepest active state toward its parents
 - Initial children for compound states
 - Parent-scope exit events displayed inside child scopes
-- Typed `StateContext` Resources shared by states in one machine
+- Dictionary context shared by states in one machine
 - `enter()`, `exit()`, `update()`, and `physics_update()`
 - Graph Editor operations with Undo/Redo
+- Inspector transition rows with same-scope Target dropdowns
 
 ## Not yet supported
 

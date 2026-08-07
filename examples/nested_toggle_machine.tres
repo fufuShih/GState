@@ -1,92 +1,60 @@
-[gd_resource type="Resource" script_class="StateMachineResource" load_steps=12 format=3]
+[gd_resource type="Resource" script_class="StateMachineResource" load_steps=6 format=3]
 
 [ext_resource type="Script" uid="uid://k8cysnueqmdq" path="res://addons/gstate/runtime/state_machine_resource.gd" id="1"]
 [ext_resource type="Script" uid="uid://bkmlfi4nsituu" path="res://addons/gstate/runtime/state.gd" id="2"]
-[ext_resource type="Script" uid="uid://cmc34giy7r8q4" path="res://addons/gstate/runtime/state_transition.gd" id="3"]
 
 [sub_resource type="Resource" id="Idle"]
 script = ExtResource("2")
-stable_id = &"state_62b318643f6b51ee"
+editor_uid = &"editor_62b318643f6b51ee"
 name = &"Idle"
+transitions = {
+&"activate": &"Active"
+}
 
 [sub_resource type="Resource" id="Active"]
 script = ExtResource("2")
-stable_id = &"state_52357b56b05123f6"
+editor_uid = &"editor_52357b56b05123f6"
 name = &"Active"
+transitions = {
+&"idle": &"Idle",
+&"lock": &"Locked"
+}
 
 [sub_resource type="Resource" id="Locked"]
 script = ExtResource("2")
-stable_id = &"state_2a0b020b53606972"
+editor_uid = &"editor_2a0b020b53606972"
 name = &"Locked"
+transitions = {
+&"unlock": &"Idle"
+}
 
 [sub_resource type="Resource" id="Off"]
 script = ExtResource("2")
-stable_id = &"state_5a6cbb5480144af6"
+editor_uid = &"editor_5a6cbb5480144af6"
 name = &"Off"
+transitions = {
+&"toggle": &"On"
+}
 
 [sub_resource type="Resource" id="On"]
 script = ExtResource("2")
-stable_id = &"state_1750f66c8c36dfd4"
+editor_uid = &"editor_1750f66c8c36dfd4"
 name = &"On"
-initial_child_id = &"state_62b318643f6b51ee"
+initial_child = &"Idle"
 children = Array[ExtResource("2")]([SubResource("Idle"), SubResource("Active"), SubResource("Locked")])
-
-[sub_resource type="Resource" id="T1"]
-script = ExtResource("3")
-id = &"transition_1aa382b1847f2e3f"
-from_state_id = &"state_5a6cbb5480144af6"
-to_state_id = &"state_1750f66c8c36dfd4"
-event = &"toggle"
-
-[sub_resource type="Resource" id="T2"]
-script = ExtResource("3")
-id = &"transition_toggle_off"
-from_state_id = &"state_1750f66c8c36dfd4"
-to_state_id = &"state_5a6cbb5480144af6"
-event = &"toggle"
-
-[sub_resource type="Resource" id="T3"]
-script = ExtResource("3")
-id = &"transition_168fbaa939276cc6"
-scope_id = &"state_1750f66c8c36dfd4"
-from_state_id = &"state_62b318643f6b51ee"
-to_state_id = &"state_52357b56b05123f6"
-event = &"activate"
-
-[sub_resource type="Resource" id="T4"]
-script = ExtResource("3")
-id = &"transition_1808b410dfe719a4"
-scope_id = &"state_1750f66c8c36dfd4"
-from_state_id = &"state_52357b56b05123f6"
-to_state_id = &"state_62b318643f6b51ee"
-event = &"idle"
-
-[sub_resource type="Resource" id="T5"]
-script = ExtResource("3")
-id = &"transition_77534d6bb1a6d048"
-scope_id = &"state_1750f66c8c36dfd4"
-from_state_id = &"state_52357b56b05123f6"
-to_state_id = &"state_2a0b020b53606972"
-event = &"lock"
-
-[sub_resource type="Resource" id="T6"]
-script = ExtResource("3")
-id = &"transition_7673c170a4f921dd"
-scope_id = &"state_1750f66c8c36dfd4"
-from_state_id = &"state_2a0b020b53606972"
-to_state_id = &"state_62b318643f6b51ee"
-event = &"unlock"
+transitions = {
+&"toggle": &"Off"
+}
 
 [resource]
 script = ExtResource("1")
-initial_state_id = &"state_5a6cbb5480144af6"
+initial_state = &"Off"
 states = Array[ExtResource("2")]([SubResource("Off"), SubResource("On")])
-transitions = Array[ExtResource("3")]([SubResource("T1"), SubResource("T2"), SubResource("T3"), SubResource("T4"), SubResource("T5"), SubResource("T6")])
 editor_positions = {
-&"state_1750f66c8c36dfd4": Vector2(1501.2004, 232.17996),
-&"state_2a0b020b53606972": Vector2(2012.9685, 843.0883),
-&"state_52357b56b05123f6": Vector2(1574.1608, 518.2602),
-&"state_5a6cbb5480144af6": Vector2(965, 106.5),
-&"state_62b318643f6b51ee": Vector2(814.48035, 404.7399)
+&"editor_1750f66c8c36dfd4": Vector2(1501.2004, 232.17996),
+&"editor_2a0b020b53606972": Vector2(2012.9685, 843.0883),
+&"editor_52357b56b05123f6": Vector2(1574.1608, 518.2602),
+&"editor_5a6cbb5480144af6": Vector2(965, 106.5),
+&"editor_62b318643f6b51ee": Vector2(814.48035, 404.7399)
 }
 editor_zoom = 0.7687919

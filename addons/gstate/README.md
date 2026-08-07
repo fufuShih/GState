@@ -18,7 +18,8 @@ in the parent scope. No End or Final node is required.
 GState is a hierarchical, event-driven state machine plugin for Godot, inspired
 by XState. Its runtime and Graph Editor currently use GDScript. The public scene
 nodes are `StateManager` and `StateMachine`; a portable
-`StateMachineResource` stores State resources, transitions, and graph metadata.
+`StateMachineResource` stores context, State resources, and graph metadata.
+Each State owns its outgoing event-to-target transition map.
 
 ## Scene structure
 
@@ -41,29 +42,18 @@ StateManager owns direct, independent StateMachine children. StateMachine nodes
 cannot contain other StateMachine nodes. Use Nested State for hierarchy inside
 one machine.
 
-Set `StateMachine.initial_state_id` to `Grounded.stable_id`,
-`Grounded.initial_child_id` to `Idle.stable_id`, and so on. Transitions connect
-direct children in one scope:
+Set `StateMachine.definition.initial_state` to `Grounded.name`,
+`Grounded.initial_child` to `Idle.name`, and so on. Transitions belong
+to their source State and connect direct children in one scope:
 
 ```gdscript
-var transition := StateTransition.new(
-	grounded.stable_id,
-	airborne.stable_id,
-	&"jump"
-)
-state_machine.graph.add_transition(transition)
+grounded.add_transition(&"jump", airborne.name)
 ```
 
-Nested transitions use the compound state's ID as their scope:
+Nested transitions use the same API; the hierarchy supplies the scope:
 
 ```gdscript
-var transition := StateTransition.new(
-	idle.stable_id,
-	run.stable_id,
-	&"move",
-	grounded.stable_id
-)
-state_machine.graph.add_transition(transition)
+idle.add_transition(&"move", run.name)
 ```
 
 ## Runtime API
@@ -77,13 +67,13 @@ state_machine.travel("Grounded/Run")
 var leaf: State = state_machine.get_current_state()
 var path: Array[State] = state_machine.get_active_path()
 var grounded_is_active := state_machine.is_in_state("Grounded")
-var context: StateContext = state_machine.get_context()
+var context: Dictionary = state_machine.get_context()
 ```
 
-Create a typed Resource that extends `StateContext`, then assign it to
-`StateMachine.initial_context` in the Inspector. Every State in that machine
-receives the same live runtime copy through `get_context()`. Starting a stopped
-machine or calling `restart()` creates a fresh copy of the initial Resource.
+Edit `StateMachineResource.context` as a Dictionary in the Inspector. Every
+State in that machine receives the same live runtime copy through
+`get_context()`. Starting a stopped machine or calling `restart()` creates a
+fresh deep copy of the Dictionary stored in the reusable `.tres`.
 
 Override any lifecycle hooks needed by a State script:
 
@@ -134,9 +124,12 @@ below it displays only that machine's current State scope:
 - Nodes only begin dragging from the titlebar after a short movement threshold.
 - State, transition, initial, and position edits support Undo/Redo.
 - Selecting a graph node opens its Resource properties in the Inspector.
-- The Graph-side Inspector shows State, Transition, and valid same-scope targets.
+- The Graph-side Inspector shows the machine Resource or selected State and
+  valid same-scope targets. A selected connection edits its source State.
+- A State's Transitions property uses Event fields and same-scope Target
+  dropdowns; `+ Add Transition` and delete work without entering internal IDs.
 - Validation issues can be opened from the `Issues` button.
 
-The complete hierarchy, transitions, and view metadata are serialized in
-`StateMachineResource`. Save `StateMachine.definition` as `.tres` to share
-it across scenes or projects.
+Context, the complete hierarchy, State-owned transitions, and view metadata
+are serialized in `StateMachineResource`. Save `StateMachine.definition` as
+`.tres` to share it across scenes or projects.

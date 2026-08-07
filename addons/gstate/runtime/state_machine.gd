@@ -20,7 +20,6 @@ signal definition_changed
 @export var active: bool = true
 @export var autostart: bool = true
 @export var actor: Node
-@export var initial_context: StateContext
 @export_category("State Machine Resource")
 @export var definition: StateMachineResource = StateMachineResource.new():
 	set(value):
@@ -38,21 +37,14 @@ var graph: StateMachineResource:
 		return definition
 	set(value):
 		definition = value
-var initial_state_id: StringName:
-	get:
-		return definition.initial_state_id if definition != null else &""
-	set(value):
-		_ensure_definition()
-		definition.initial_state_id = value
-
-var states_by_id: Dictionary[StringName, State] = {}
+var states_by_uid: Dictionary[StringName, State] = {}
 var active_path: Array[State] = []
 var state_manager: Node
 
 var _runtime_root_states: Array[State] = []
 var _running: bool = false
 var _transitioning: bool = false
-var _context: StateContext
+var _context: Dictionary = {}
 
 
 func _ready() -> void:
@@ -111,12 +103,15 @@ func start() -> bool:
 
 	reset_context()
 	_rebuild_state_registry()
-	var initial_state: State = states_by_id.get(initial_state_id)
-	if initial_state == null:
+	var initial: State = _find_direct_state_by_name(
+			_runtime_root_states,
+			definition.initial_state
+	)
+	if initial == null:
 		return false
 
 	var target_path: Array[State] = _expand_initial_children(
-			_resolve_target_path(initial_state)
+			_resolve_target_path(initial)
 	)
 	if target_path.is_empty() or not _is_path_enabled(target_path):
 		return false
@@ -162,16 +157,14 @@ func send(event: StringName, payload: Variant = null) -> bool:
 
 	for index: int in range(active_path.size() - 1, -1, -1):
 		var source: State = active_path[index]
-		var scope_id: StringName = StateTransition.ROOT_SCOPE_ID
-		if source.parent_state != null:
-			scope_id = source.parent_state.stable_id
-		var transition: StateTransition = graph.find_transition(
-				scope_id,
-				source.stable_id,
-				event
-		)
-		if transition != null:
-			var target: State = states_by_id.get(transition.to_state_id)
+		var target_name: StringName = source.get_transition_target(event)
+		if not target_name.is_empty():
+			var siblings: Array[State] = (
+				source.parent_state.get_state_children()
+				if source.parent_state != null
+				else _runtime_root_states
+			)
+			var target := _find_direct_state_by_name(siblings, target_name)
 			if target == null or not target.enabled:
 				break
 			return _change_state(target, payload, event)
@@ -189,10 +182,8 @@ func travel(state_path: Variant, payload: Variant = null) -> bool:
 	return _change_state(target, payload, &"")
 
 
-func get_state(state_id: StringName) -> State:
-	if states_by_id.has(state_id):
-		return states_by_id[state_id]
-	return definition.find_state(state_id) if definition != null else null
+func get_state(state_path: Variant) -> State:
+	return _resolve_state_reference(state_path)
 
 
 func get_current_state() -> State:
@@ -215,16 +206,16 @@ func is_running() -> bool:
 
 
 ## Returns the live context shared by every State in this machine.
-func get_context() -> StateContext:
+func get_context() -> Dictionary:
 	return _context
 
 
-## Creates a fresh runtime copy of initial_context.
-func reset_context() -> StateContext:
+## Creates a fresh runtime copy of the definition's context template.
+func reset_context() -> Dictionary:
 	_context = (
-			initial_context.duplicate(true) as StateContext
-			if initial_context != null
-			else null
+		definition.context.duplicate(true)
+		if definition != null
+		else {}
 	)
 	return _context
 
@@ -247,7 +238,8 @@ func validate() -> Dictionary:
 		return {"errors": errors, "warnings": warnings}
 	errors.append_array(definition.get_structure_errors())
 	var all_states: Array[State] = definition.get_all_states()
-	var ids_seen: Dictionary[StringName, State] = {}
+	var uids_seen: Dictionary[StringName, State] = {}
+	var scoped_names: Dictionary[String, State] = {}
 
 	if get_parent() is StateMachine:
 		errors.append(
@@ -258,52 +250,65 @@ func validate() -> Dictionary:
 		if state == null:
 			errors.append("Definition contains a null State.")
 			continue
-		if state.stable_id.is_empty():
-			errors.append("State '%s' has an empty stable_id." % state.name)
-		elif ids_seen.has(state.stable_id):
+		if state.editor_uid.is_empty():
+			errors.append("State '%s' has no internal editor UID." % state.name)
+		elif uids_seen.has(state.editor_uid):
 			errors.append(
-					"Duplicate stable_id '%s' on '%s' and '%s'."
+					"Duplicate internal editor UID on '%s' and '%s'."
 					% [
-						state.stable_id,
-						(ids_seen[state.stable_id] as State).name,
+						(uids_seen[state.editor_uid] as State).name,
 						state.name,
 					]
 			)
 		else:
-			ids_seen[state.stable_id] = state
+			uids_seen[state.editor_uid] = state
+		if state.name.is_empty():
+			errors.append("Definition contains a State with an empty name.")
+		elif "/" in str(state.name):
+			errors.append("State name '%s' cannot contain '/'." % state.name)
+		var parent := definition.find_parent_state(state)
+		var scope_uid := parent.editor_uid if parent != null else &"root"
+		var scoped_key := "%s/%s" % [scope_uid, state.name]
+		if scoped_names.has(scoped_key):
+			errors.append(
+					"Scope contains more than one State named '%s'."
+					% state.name
+			)
+		else:
+			scoped_names[scoped_key] = state
 
-	if initial_state_id.is_empty():
-		errors.append("Definition has no initial_state_id.")
-	elif not _is_direct_child_id(null, initial_state_id, false):
+	if definition.initial_state.is_empty():
+		errors.append("Definition has no initial State.")
+	elif not _is_direct_child_name(null, definition.initial_state, false):
 		errors.append(
 				"Root initial state '%s' is not a root State."
-				% initial_state_id
+				% definition.initial_state
 		)
 
 	for state: State in all_states:
 		var children: Array[State] = state.get_state_children()
 		if not children.is_empty():
-			if state.initial_child_id.is_empty():
+			if state.initial_child.is_empty():
 				errors.append(
-						"Compound state '%s' has no initial_child_id."
+						"Compound state '%s' has no initial child."
 						% state.name
 				)
-			elif not _is_direct_child_id(
+			elif not _is_direct_child_name(
 					state,
-					state.initial_child_id,
+					state.initial_child,
 					false
 			):
 				errors.append(
 						"Initial child '%s' is not a direct child of '%s'."
-						% [state.initial_child_id, state.name]
+						% [state.initial_child, state.name]
 				)
-		elif not state.initial_child_id.is_empty():
+		elif not state.initial_child.is_empty():
 			warnings.append(
-					"Leaf state '%s' has an unused initial_child_id."
+					"Leaf state '%s' has an unused initial child."
 					% state.name
 			)
 
-	_validate_transitions(errors, warnings, ids_seen)
+	_validate_transitions(errors, warnings)
 	return {"errors": errors, "warnings": warnings}
 
 
@@ -393,11 +398,10 @@ func _expand_initial_children(path: Array[State]) -> Array[State]:
 	var result: Array[State] = path.duplicate()
 	var cursor: State = result.back()
 	while cursor.is_compound():
-		var initial_child: State = null
-		for child: State in cursor.get_state_children():
-			if child.stable_id == cursor.initial_child_id:
-				initial_child = child
-				break
+		var initial_child := _find_direct_state_by_name(
+				cursor.get_state_children(),
+				cursor.initial_child
+		)
 		if initial_child == null:
 			return []
 		result.append(initial_child)
@@ -410,27 +414,16 @@ func _resolve_state_reference(reference: Variant) -> State:
 		var candidate := reference as State
 		if candidate.state_machine == self:
 			return candidate
-		return states_by_id.get(candidate.stable_id)
+		return states_by_uid.get(candidate.editor_uid)
 
 	var text: String = str(reference).strip_edges().trim_prefix("/").trim_suffix("/")
 	if text.is_empty():
 		return null
-	var id := StringName(text)
-	if states_by_id.has(id):
-		return states_by_id[id]
-
 	var segments: PackedStringArray = text.split("/", false)
 	var candidates: Array[State] = _runtime_root_states
 	var found: State = null
 	for segment: String in segments:
-		found = null
-		for state: State in candidates:
-			if state != null and (
-					state.name == StringName(segment)
-					or state.stable_id == StringName(segment)
-			):
-				found = state
-				break
+		found = _find_direct_state_by_name(candidates, StringName(segment))
 		if found == null:
 			return null
 		candidates = found.get_state_children()
@@ -438,7 +431,7 @@ func _resolve_state_reference(reference: Variant) -> State:
 
 
 func _rebuild_state_registry() -> void:
-	states_by_id.clear()
+	states_by_uid.clear()
 	_runtime_root_states.clear()
 	if definition == null:
 		return
@@ -468,11 +461,11 @@ func _rebuild_state_registry() -> void:
 func _register_state_tree(
 		state: State,
 		parent: State,
-		context_actor: Node
+	context_actor: Node
 ) -> void:
 	state._set_runtime_context(self, parent, context_actor)
-	if not state.stable_id.is_empty() and not states_by_id.has(state.stable_id):
-		states_by_id[state.stable_id] = state
+	if not state.editor_uid.is_empty() and not states_by_uid.has(state.editor_uid):
+		states_by_uid[state.editor_uid] = state
 	for child: State in state.get_state_children():
 		if child != null:
 			_register_state_tree(child, state, context_actor)
@@ -488,9 +481,9 @@ func _append_state_tree(state: State, result: Array[State]) -> void:
 		_append_state_tree(child, result)
 
 
-func _is_direct_child_id(
+func _is_direct_child_name(
 		scope: State,
-		state_id: StringName,
+		state_name: StringName,
 		runtime: bool = true
 ) -> bool:
 	var children: Array[State]
@@ -501,9 +494,19 @@ func _is_direct_child_id(
 	elif definition != null:
 		children = definition.get_direct_states()
 	for child: State in children:
-		if child != null and child.stable_id == state_id:
+		if child != null and child.name == state_name:
 			return true
 	return false
+
+
+func _find_direct_state_by_name(
+		states: Array[State],
+		state_name: StringName
+) -> State:
+	for state: State in states:
+		if state != null and state.name == state_name:
+			return state
+	return null
 
 
 func _is_path_enabled(path: Array[State]) -> bool:
@@ -515,69 +518,32 @@ func _is_path_enabled(path: Array[State]) -> bool:
 
 func _validate_transitions(
 		errors: PackedStringArray,
-		_warnings: PackedStringArray,
-		definitions_by_id: Dictionary[StringName, State]
+		_warnings: PackedStringArray
 ) -> void:
-	var transition_keys: Dictionary[String, StateTransition] = {}
-	for transition: StateTransition in definition.transitions:
-		if transition == null:
-			errors.append("Graph contains a null transition.")
+	for from_state: State in definition.get_all_states():
+		if from_state == null:
 			continue
-		if transition.event.is_empty():
-			errors.append("Transition '%s' has an empty event." % transition.id)
-
-		var scope: State = null
-		if not transition.scope_id.is_empty():
-			scope = definitions_by_id.get(transition.scope_id)
-			if scope == null:
+		var scope: State = definition.find_parent_state(from_state)
+		var siblings := definition.get_direct_states(scope)
+		for event: StringName in from_state.transitions:
+			var target_name: StringName = from_state.transitions[event]
+			if event.is_empty():
 				errors.append(
-						"Transition '%s' references missing scope '%s'."
-						% [transition.id, transition.scope_id]
+						"State '%s' contains a transition with an empty event."
+						% from_state.name
+				)
+			if target_name.is_empty():
+				errors.append(
+						"Transition '%s' from '%s' has no target."
+						% [event, from_state.name]
 				)
 				continue
-
-		var from_state: State = definitions_by_id.get(transition.from_state_id)
-		var to_state: State = definitions_by_id.get(transition.to_state_id)
-		if from_state == null:
-			errors.append(
-					"Transition '%s' references missing source '%s'."
-					% [transition.id, transition.from_state_id]
-			)
-		if to_state == null:
-			errors.append(
-					"Transition '%s' references missing target '%s'."
-					% [transition.id, transition.to_state_id]
-			)
-		if from_state == null or to_state == null:
-			continue
-
-		if not _is_direct_child_id(scope, from_state.stable_id, false):
-			errors.append(
-					"Transition '%s' source '%s' is not a direct child of its scope."
-					% [transition.id, from_state.stable_id]
-			)
-		if not _is_direct_child_id(scope, to_state.stable_id, false):
-			errors.append(
-					"Transition '%s' target '%s' is not a direct child of its scope."
-					% [transition.id, to_state.stable_id]
-			)
-
-		var key: String = "%s|%s|%s" % [
-			transition.scope_id,
-			transition.from_state_id,
-			transition.event,
-		]
-		if transition_keys.has(key):
-			errors.append(
-					"Duplicate event '%s' from state '%s' in scope '%s'."
-					% [
-						transition.event,
-						transition.from_state_id,
-						transition.scope_id,
-					]
-			)
-		else:
-			transition_keys[key] = transition
+			var to_state := _find_direct_state_by_name(siblings, target_name)
+			if to_state == null:
+				errors.append(
+						"Transition '%s' from '%s' references missing target '%s'."
+						% [event, from_state.name, target_name]
+				)
 
 
 func _report_validation(validation: Dictionary) -> bool:

@@ -4,12 +4,18 @@ extends EditorPlugin
 const StateMachineEditorScene := preload(
 		"res://addons/gstate/editor/state_machine_editor.tscn"
 )
+const StateTransitionsInspectorScript := preload(
+		"res://addons/gstate/editor/state_transitions_inspector.gd"
+)
 
 var _state_machine_editor: GStateMachineEditor
 var _bottom_panel_button: Button
+var _state_transitions_inspector: EditorInspectorPlugin
 
 
 func _enter_tree() -> void:
+	_state_transitions_inspector = StateTransitionsInspectorScript.new()
+	add_inspector_plugin(_state_transitions_inspector)
 	_state_machine_editor = StateMachineEditorScene.instantiate()
 	_state_machine_editor.setup_editor(
 			get_undo_redo(),
@@ -23,6 +29,9 @@ func _enter_tree() -> void:
 
 
 func _exit_tree() -> void:
+	if _state_transitions_inspector != null:
+		remove_inspector_plugin(_state_transitions_inspector)
+	_state_transitions_inspector = null
 	if _state_machine_editor != null:
 		remove_control_from_bottom_panel(_state_machine_editor)
 		_state_machine_editor.queue_free()
@@ -36,7 +45,6 @@ func _handles(object: Object) -> bool:
 		or object is StateMachine
 		or object is StateMachineResource
 		or object is State
-		or object is StateTransition
 	)
 
 

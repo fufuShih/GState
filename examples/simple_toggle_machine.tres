@@ -1,41 +1,31 @@
-[gd_resource type="Resource" script_class="StateMachineResource" load_steps=6 format=3]
+[gd_resource type="Resource" script_class="StateMachineResource" load_steps=4 format=3]
 
 [ext_resource type="Script" uid="uid://k8cysnueqmdq" path="res://addons/gstate/runtime/state_machine_resource.gd" id="1_resource"]
 [ext_resource type="Script" uid="uid://bkmlfi4nsituu" path="res://addons/gstate/runtime/state.gd" id="2_state"]
-[ext_resource type="Script" uid="uid://cmc34giy7r8q4" path="res://addons/gstate/runtime/state_transition.gd" id="3_transition"]
 
 [sub_resource type="Resource" id="State_Off"]
 script = ExtResource("2_state")
-stable_id = &"state_6d506d46f665a06d"
+editor_uid = &"editor_6d506d46f665a06d"
 name = &"Off"
+transitions = {
+&"toggle": &"On"
+}
 
 [sub_resource type="Resource" id="State_On"]
 script = ExtResource("2_state")
-stable_id = &"state_71b3c14ca3624acf"
+editor_uid = &"editor_71b3c14ca3624acf"
 name = &"On"
-
-[sub_resource type="Resource" id="Transition_On"]
-script = ExtResource("3_transition")
-id = &"transition_cf8f3b5f06e7fbd"
-from_state_id = &"state_6d506d46f665a06d"
-to_state_id = &"state_71b3c14ca3624acf"
-event = &"toggle"
-
-[sub_resource type="Resource" id="Transition_Off"]
-script = ExtResource("3_transition")
-id = &"transition_e3578c62f008b6f"
-from_state_id = &"state_71b3c14ca3624acf"
-to_state_id = &"state_6d506d46f665a06d"
-event = &"toggle"
+transitions = {
+&"toggle": &"Off"
+}
 
 [resource]
 script = ExtResource("1_resource")
-initial_state_id = &"state_6d506d46f665a06d"
+initial_state = &"Off"
 states = Array[ExtResource("2_state")]([SubResource("State_Off"), SubResource("State_On")])
-transitions = Array[ExtResource("3_transition")]([SubResource("Transition_On"), SubResource("Transition_Off")])
 editor_positions = {
-&"state_6d506d46f665a06d": Vector2(1146, 212.5),
-&"state_71b3c14ca3624acf": Vector2(1646.7601, 275.61993)
+&"editor_6d506d46f665a06d": Vector2(1146, 212.5),
+&"editor_71b3c14ca3624acf": Vector2(1646.7601, 275.61993)
 }
 editor_scroll = Vector2(-289.8595, 1.6493835)
 editor_zoom = 0.5900986

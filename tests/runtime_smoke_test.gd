@@ -1,7 +1,6 @@
 extends SceneTree
 
 const RecordingState := preload("res://tests/recording_state.gd")
-const RecordingContext := preload("res://tests/recording_context.gd")
 const StateMachineEditorScene := preload(
 		"res://addons/gstate/editor/state_machine_editor.tscn"
 )
@@ -16,6 +15,16 @@ func _initialize() -> void:
 
 func _run() -> void:
 	RecordingState.calls = _calls
+	var session_definition := load(
+			"res://examples/sample3/session_machine.tres"
+	) as StateMachineResource
+	var serialized_playing := session_definition.find_state(&"Playing")
+	_expect(
+		session_definition.initial_state == &"Idle"
+		and serialized_playing != null
+		and serialized_playing.transitions[&"finish"] == &"Result",
+		"serialized resources use readable State names"
+	)
 	var host := Node.new()
 	host.name = &"Player"
 	var manager := StateManager.new()
@@ -25,24 +34,24 @@ func _run() -> void:
 	var machine := StateMachine.new()
 	machine.name = &"Movement"
 	machine.autostart = false
-	var movement_context := RecordingContext.new()
-	movement_context.speed = 120.0
-	movement_context.stats = {&"energy": 3}
-	machine.initial_context = movement_context
+	var movement_context: Dictionary = {
+		&"speed": 120.0,
+		&"stats": {&"energy": 3},
+	}
+	machine.definition.context = movement_context
 	manager.add_child(machine)
 
 	var ui_machine := StateMachine.new()
 	ui_machine.name = &"UI"
 	ui_machine.autostart = false
-	var ui_context := RecordingContext.new()
-	ui_context.screen = &"menu"
-	ui_machine.initial_context = ui_context
+	var ui_context: Dictionary = {&"screen": &"menu"}
+	ui_machine.definition.context = ui_context
 	manager.add_child(ui_machine)
 	var menu_closed := State.new()
 	menu_closed.name = &"Closed"
-	menu_closed.stable_id = &"closed"
+	menu_closed.editor_uid = &"editor_closed"
 	ui_machine.definition.add_state(menu_closed)
-	ui_machine.initial_state_id = menu_closed.stable_id
+	ui_machine.definition.initial_state = menu_closed.name
 
 	var shared_machine := StateMachine.new()
 	shared_machine.name = &"MovementCopy"
@@ -58,9 +67,9 @@ func _run() -> void:
 	var fall := _add_state(airborne, &"Fall", &"fall")
 	var dead := _add_state(machine, &"Dead", &"dead")
 
-	machine.initial_state_id = grounded.stable_id
-	grounded.initial_child_id = idle.stable_id
-	airborne.initial_child_id = jump.stable_id
+	machine.definition.initial_state = grounded.name
+	grounded.initial_child = idle.name
+	airborne.initial_child = jump.name
 
 	_add_transition(machine, grounded, airborne, &"jump")
 	_add_transition(machine, airborne, grounded, &"land")
@@ -69,6 +78,13 @@ func _run() -> void:
 	_add_transition(machine, idle, run, &"move", grounded)
 	_add_transition(machine, run, idle, &"stop", grounded)
 	_add_transition(machine, jump, fall, &"falling", airborne)
+	idle.name = &"Resting"
+	_expect(
+		grounded.initial_child == &"Resting"
+		and run.transitions[&"stop"] == &"Resting",
+		"renaming a State updates initial and incoming same-scope references"
+	)
+	idle.name = &"Idle"
 
 	get_root().add_child(host)
 	await process_frame
@@ -89,49 +105,48 @@ func _run() -> void:
 	)
 	_expect_path(machine, "Grounded/Idle")
 	_expect(
-		machine.get_state(grounded.stable_id).actor == host,
+		machine.get_state(&"Grounded").actor == host,
 		"State actor defaults through StateManager"
 	)
 	_expect(
-		ui_machine.get_state(menu_closed.stable_id).actor == host,
+		ui_machine.get_state(&"Closed").actor == host,
 		"manager shares its actor with child machines"
 	)
-	var runtime_context := machine.get_context() as RecordingContext
-	var state_context := (
-		machine.get_state(grounded.stable_id).get_context() as RecordingContext
-	)
-	var runtime_ui_context := ui_machine.get_context() as RecordingContext
+	var runtime_context := machine.get_context()
+	var state_context := machine.get_state(&"Grounded").get_context()
+	var runtime_ui_context := ui_machine.get_context()
+	var shared_context := shared_machine.get_context()
 	_expect(
-		runtime_context != null
-		and runtime_context.speed == 120.0
-		and runtime_context != movement_context,
-		"start duplicates the initial context Resource"
+		runtime_context.get(&"speed") == 120.0,
+		"start duplicates the definition context Dictionary"
 	)
 	_expect(
 		state_context == runtime_context,
 		"every State reads the same live context Resource"
 	)
 	_expect(
-		runtime_ui_context != null
-		and runtime_ui_context.screen == &"menu"
+		runtime_ui_context.get(&"screen") == &"menu"
 		and runtime_ui_context != runtime_context,
 		"independent machines have isolated contexts"
 	)
 
-	runtime_context.speed = 240.0
-	runtime_context.stats[&"energy"] = 7
-	var run_context := (
-		machine.get_state(run.stable_id).get_context() as RecordingContext
-	)
+	runtime_context[&"speed"] = 240.0
+	(runtime_context[&"stats"] as Dictionary)[&"energy"] = 7
+	var run_context := machine.get_state("Grounded/Run").get_context()
 	_expect(
-		run_context.speed == 240.0
-		and run_context.stats[&"energy"] == 7,
+		run_context[&"speed"] == 240.0
+		and (run_context[&"stats"] as Dictionary)[&"energy"] == 7,
 		"all States share direct runtime context writes"
 	)
 	_expect(
-		movement_context.speed == 120.0
-		and movement_context.stats[&"energy"] == 3,
-		"runtime writes do not mutate the initial context Resource"
+		movement_context[&"speed"] == 120.0
+		and (movement_context[&"stats"] as Dictionary)[&"energy"] == 3,
+		"runtime writes do not mutate the definition context Dictionary"
+	)
+	_expect(
+		shared_context[&"speed"] == 120.0
+		and (shared_context[&"stats"] as Dictionary)[&"energy"] == 3,
+		"machines sharing one .tres keep isolated runtime contexts"
 	)
 
 	_calls.clear()
@@ -173,12 +188,12 @@ func _run() -> void:
 	var previous_context := machine.get_context()
 	_expect(machine.restart(), "restart with context must succeed")
 	_expect_path(machine, "Grounded/Idle")
-	var restarted_context := machine.get_context() as RecordingContext
+	var restarted_context := machine.get_context()
 	_expect(
 		restarted_context != previous_context
-		and restarted_context.speed == 120.0
-		and restarted_context.stats[&"energy"] == 3,
-		"restart restores the initial context"
+		and restarted_context[&"speed"] == 120.0
+		and (restarted_context[&"stats"] as Dictionary)[&"energy"] == 3,
+		"restart restores the definition context"
 	)
 
 	var graph_view: GStateMachineEditor = StateMachineEditorScene.instantiate()
@@ -235,13 +250,15 @@ func _run() -> void:
 		"State IN rows remain numbered"
 	)
 	var long_event := &"this_transition_event_name_must_stay_complete"
-	var long_transition := StateTransition.new(
-			grounded.stable_id,
-			dead.stable_id,
-			long_event
-	)
-	var long_outgoing: Array[StateTransition] = [long_transition]
-	var no_incoming: Array[StateTransition] = []
+	var long_transition: Dictionary = {
+		&"source": grounded,
+		&"source_uid": grounded.editor_uid,
+		&"target_uid": dead.editor_uid,
+		&"target_name": dead.name,
+		&"event": long_event,
+	}
+	var long_outgoing: Array[Dictionary] = [long_transition]
+	var no_incoming: Array[Dictionary] = []
 	var preview_node := GStateGraphNode.new()
 	preview_node.setup(grounded, false, long_outgoing, no_incoming)
 	var preview_port_row := preview_node.get_child(2) as HBoxContainer
@@ -262,25 +279,13 @@ func _run() -> void:
 	)
 	graph_view.queue_free()
 
-	var duplicate := StateTransition.new(
-			idle.stable_id,
-			run.stable_id,
-			&"move",
-			grounded.stable_id
-	)
-	machine.graph.add_transition(duplicate)
-	var cross_scope := StateTransition.new(
-			run.stable_id,
-			airborne.stable_id,
-			&"launch",
-			grounded.stable_id
-	)
-	machine.graph.add_transition(cross_scope)
+	idle.transitions[&""] = run.name
+	idle.transitions[&"launch"] = airborne.name
 	var invalid_result: Dictionary = machine.validate()
 	var invalid_errors: PackedStringArray = invalid_result["errors"]
 	_expect(
 		not invalid_errors.is_empty(),
-		"duplicate source event must fail validation"
+		"empty transition event must fail validation"
 	)
 	_expect(
 		invalid_errors.size() >= 2,
@@ -311,7 +316,7 @@ func _run() -> void:
 func _add_state(parent: Variant, state_name: StringName, id: StringName) -> State:
 	var state: State = RecordingState.new()
 	state.name = state_name
-	state.stable_id = id
+	state.editor_uid = StringName("editor_%s" % id)
 	if parent is StateMachine:
 		(parent as StateMachine).definition.add_state(state)
 	elif parent is State:
@@ -320,22 +325,16 @@ func _add_state(parent: Variant, state_name: StringName, id: StringName) -> Stat
 
 
 func _add_transition(
-		machine: StateMachine,
+		_machine: StateMachine,
 		from_state: State,
 		to_state: State,
 		event: StringName,
-		scope: State = null
+		_scope: State = null
 ) -> void:
-	var scope_id := StateTransition.ROOT_SCOPE_ID
-	if scope != null:
-		scope_id = scope.stable_id
-	var transition := StateTransition.new(
-			from_state.stable_id,
-			to_state.stable_id,
-			event,
-			scope_id
+	_expect(
+		from_state.add_transition(event, to_state.name),
+		"transition must be added to its source State"
 	)
-	_expect(machine.graph.add_transition(transition), "transition must be added")
 
 
 func _expect_path(machine: StateMachine, expected: String) -> void:

@@ -4,22 +4,25 @@ extends Resource
 
 ## Portable definition. Save this Resource as .tres for reuse.
 
-@export var initial_state_id: StringName = &"":
+@export var context: Dictionary = {}:
 	set(value):
-		if initial_state_id != value:
-			initial_state_id = value
+		context = value
+		emit_changed()
+@export var initial_state: StringName = &"":
+	set(value):
+		if initial_state != value:
+			initial_state = value
 			emit_changed()
 @export var states: Array[State] = []:
 	set(value):
 		states = value
-		emit_changed()
-@export var transitions: Array[StateTransition] = []:
-	set(value):
-		transitions = value
+		_bind_all_states()
 		emit_changed()
 @export_storage var editor_positions: Dictionary = {}
 @export_storage var editor_scroll := Vector2.ZERO
 @export_storage var editor_zoom := 1.0
+
+var _bound_states: Array[State] = []
 
 
 func add_state(state: State, parent: State = null) -> bool:
@@ -34,20 +37,38 @@ func add_state(state: State, parent: State = null) -> bool:
 		return false
 	if get_direct_states(parent).size() == 1:
 		if parent == null:
-			initial_state_id = state.stable_id
+			initial_state = state.name
 		else:
-			parent.initial_child_id = state.stable_id
+			parent.initial_child = state.name
+	_bind_state_tree(state)
 	emit_changed()
 	return true
 
 
 func contains_state(state: State) -> bool:
-	return state != null and find_state(state.stable_id) == state
+	return state != null and get_all_states().has(state)
 
 
-func find_state(state_id: StringName) -> State:
-	for state: State in get_all_states():
-		if state != null and state.stable_id == state_id:
+func find_state(state_path: Variant) -> State:
+	var text: String = str(state_path).strip_edges().trim_prefix("/").trim_suffix("/")
+	if text.is_empty():
+		return null
+	var candidates: Array[State] = states
+	var found: State
+	for segment: String in text.split("/", false):
+		found = find_direct_state(candidates, StringName(segment))
+		if found == null:
+			return null
+		candidates = found.get_state_children()
+	return found
+
+
+func find_direct_state(
+		candidates: Array[State],
+		state_name: StringName
+) -> State:
+	for state: State in candidates:
+		if state != null and state.name == state_name:
 			return state
 	return null
 
@@ -66,6 +87,7 @@ func get_direct_states(parent: State = null) -> Array[State]:
 
 
 func get_all_states() -> Array[State]:
+	_bind_all_states()
 	var result: Array[State] = []
 	var visited: Dictionary[int, bool] = {}
 	for state: State in states:
@@ -75,6 +97,7 @@ func get_all_states() -> Array[State]:
 
 
 func get_structure_errors() -> PackedStringArray:
+	_bind_all_states()
 	var errors := PackedStringArray()
 	var visited: Dictionary[int, bool] = {}
 	for state: State in states:
@@ -82,63 +105,11 @@ func get_structure_errors() -> PackedStringArray:
 	return errors
 
 
-func add_transition(transition: StateTransition) -> bool:
-	if transition == null:
-		return false
-	if transition.id.is_empty():
-		transition.id = StringName("transition_%x" % ResourceUID.create_id())
-	for existing: StateTransition in transitions:
-		if existing == transition or existing.id == transition.id:
-			return false
-	transitions.append(transition)
-	emit_changed()
-	return true
-
-
-func remove_transition(transition_or_id: Variant) -> bool:
-	var target_id: StringName = (
-		(transition_or_id as StateTransition).id
-		if transition_or_id is StateTransition
-		else StringName(str(transition_or_id))
-	)
-	for index: int in range(transitions.size()):
-		var transition := transitions[index]
-		if transition == transition_or_id or transition.id == target_id:
-			transitions.remove_at(index)
-			emit_changed()
-			return true
-	return false
-
-
-func get_transitions_for_scope(scope_id: StringName) -> Array[StateTransition]:
-	var result: Array[StateTransition] = []
-	for transition: StateTransition in transitions:
-		if transition != null and transition.scope_id == scope_id:
-			result.append(transition)
-	return result
-
-
-func find_transition(
-		scope_id: StringName,
-		from_state_id: StringName,
-		event: StringName
-) -> StateTransition:
-	for transition: StateTransition in transitions:
-		if (
-			transition != null
-			and transition.scope_id == scope_id
-			and transition.from_state_id == from_state_id
-			and transition.event == event
-		):
-			return transition
-	return null
-
-
 func set_state_position(state_or_id: Variant, position: Vector2) -> void:
-	var state_id := _get_state_id(state_or_id)
-	if state_id.is_empty():
+	var editor_uid := _get_editor_uid(state_or_id)
+	if editor_uid.is_empty():
 		return
-	editor_positions[state_id] = position
+	editor_positions[editor_uid] = position
 	emit_changed()
 
 
@@ -147,14 +118,14 @@ func get_state_position(
 		default_position: Vector2 = Vector2.ZERO
 ) -> Vector2:
 	var stored: Variant = editor_positions.get(
-			_get_state_id(state_or_id),
+			_get_editor_uid(state_or_id),
 			default_position
 	)
 	return stored if stored is Vector2 else default_position
 
 
 func remove_state_position(state_or_id: Variant) -> bool:
-	if not editor_positions.erase(_get_state_id(state_or_id)):
+	if not editor_positions.erase(_get_editor_uid(state_or_id)):
 		return false
 	emit_changed()
 	return true
@@ -214,9 +185,74 @@ func _validate_tree(
 		_validate_tree(child, visited, errors)
 
 
-static func _get_state_id(state_or_id: Variant) -> StringName:
+static func _get_editor_uid(state_or_id: Variant) -> StringName:
 	return (
-		(state_or_id as State).stable_id
+		(state_or_id as State).editor_uid
 		if state_or_id is State
 		else StringName(str(state_or_id))
 	)
+
+
+func _bind_all_states() -> void:
+	var previously_bound: Array[State] = _bound_states.duplicate()
+	_bound_states.clear()
+	var visited: Dictionary[int, bool] = {}
+	for state: State in states:
+		if state != null:
+			_bind_state_tree_recursive(state, visited)
+	for state: State in previously_bound:
+		if state == null or _bound_states.has(state):
+			continue
+		state._set_definition_owner(null)
+
+
+func _bind_state_tree(state: State) -> void:
+	var visited: Dictionary[int, bool] = {}
+	_bind_state_tree_recursive(state, visited)
+
+
+func _bind_state_tree_recursive(
+		state: State,
+		visited: Dictionary[int, bool]
+) -> void:
+	if state == null:
+		return
+	var instance_id := state.get_instance_id()
+	if visited.has(instance_id):
+		return
+	visited[instance_id] = true
+	if not _bound_states.has(state):
+		_bound_states.append(state)
+	state._set_definition_owner(self)
+	for child: State in state.children:
+		_bind_state_tree_recursive(child, visited)
+
+
+func _on_state_name_changed(
+		state: State,
+		previous_name: StringName,
+		new_name: StringName
+) -> void:
+	if previous_name == new_name:
+		return
+	var parent := find_parent_state(state)
+	if parent == null:
+		if initial_state == previous_name:
+			initial_state = new_name
+	else:
+		if parent.initial_child == previous_name:
+			parent.initial_child = new_name
+	for sibling: State in get_direct_states(parent):
+		if sibling == null:
+			continue
+		var updated: Dictionary[StringName, StringName] = (
+				sibling.transitions.duplicate(true)
+		)
+		var changed := false
+		for event: StringName in updated:
+			if updated[event] == previous_name:
+				updated[event] = new_name
+				changed = true
+		if changed:
+			sibling.transitions = updated
+	emit_changed()

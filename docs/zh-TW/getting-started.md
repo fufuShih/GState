@@ -46,8 +46,14 @@ State 子節點。選取 Main 後，可在 Inspector 展開 Definition，使用�
 份資源指派給 StateMachine，就能共用相同定義；每台 Machine 的 runtime
 State 仍會各自複製，不會互相污染。
 
-Graph 右側 Inspector 會依選取內容顯示 State 或 Transition 屬性。選取
-State 時也會列出同一 Scope 中可以合法連線的目標。
+Graph 右側 Inspector 會顯示整台 Machine Resource 或選取的 State；選取
+連線時會聚焦它的來源 State，因為 Transition 就存放在該 State 的
+`transitions` 欄位。選取 State 時也會列出同一 Scope 中可以合法連線的
+目標。
+
+State 的 `Transitions` 屬性會為每條連線顯示 Event 欄位、同 Scope
+Target 下拉選單與刪除按鈕；使用 `+ Add Transition` 就能新增，不需要
+複製任何內部 ID。
 
 ## 3. 建立 Transition
 

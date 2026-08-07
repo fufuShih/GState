@@ -43,8 +43,17 @@ contains errors.
 state_machine.send(&"move")
 state_machine.send(&"damage", {"amount": 10})
 state_machine.travel("Grounded/Run")
-state_machine.travel(state_machine.definition.find_state(&"run"))
+state_machine.travel(state_machine.definition.find_state("Grounded/Run"))
 ```
+
+A transition is an entry on its source State:
+
+```gdscript
+idle.add_transition(&"move", run.name)
+```
+
+The hierarchy supplies its scope. The Inspector presents the target as a
+same-scope dropdown, while the `.tres` stores the readable State name.
 
 - `send()` searches the current active path for an event transition.
 - `payload` is passed to `enter()` and signals for that transition.
@@ -53,33 +62,32 @@ state_machine.travel(state_machine.definition.find_state(&"run"))
 
 ### Context
 
-Context uses a custom typed `StateContext` Resource:
+Context is a Dictionary stored in the reusable StateMachine Resource:
 
 ```gdscript
-class_name MovementContext
-extends StateContext
-
-@export var speed: float = 120.0
-@export var direction: Vector2 = Vector2.ZERO
+state_machine.definition.context = {
+	&"speed": 120.0,
+	&"direction": Vector2.ZERO,
+}
 ```
 
-Assign a `MovementContext` Resource to `initial_context` in the StateMachine
-Inspector. A State can then read and write the runtime context directly:
+You can edit the same `context` Dictionary from the Inspector. A State reads
+and writes the runtime copy directly:
 
 ```gdscript
 extends State
 
 
 func enter(_previous_state: State, _payload: Variant = null) -> void:
-	var context := get_context() as MovementContext
-	context.speed = 240.0
-	context.direction = Vector2.RIGHT
+	var context := get_context()
+	context[&"speed"] = 240.0
+	context[&"direction"] = Vector2.RIGHT
 ```
 
-- Every State in one StateMachine receives the same runtime Resource.
-- Starting a stopped machine or calling `restart()` duplicates
-  `initial_context`, leaving the Inspector Resource unchanged.
-- When `initial_context` is empty, `get_context()` returns `null`.
+- Every State in one StateMachine receives the same runtime Dictionary.
+- Starting a stopped machine or calling `restart()` deep-copies the
+  definition's `context`, leaving the `.tres` template unchanged.
+- When `context` is empty, `get_context()` returns an empty Dictionary.
 - `reset_context()` explicitly creates a fresh runtime copy.
 - Runtime contexts are isolated between StateMachines.
 
@@ -92,7 +100,7 @@ var running: bool = state_machine.is_running()
 
 state_machine.is_in_state("Grounded")
 state_machine.is_in_state("Grounded/Run")
-state_machine.is_in_state(state_machine.definition.find_state(&"grounded"))
+state_machine.is_in_state(state_machine.definition.find_state(&"Grounded"))
 ```
 
 `get_current_state()` returns the deepest State in the active path. It returns

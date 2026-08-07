@@ -48,8 +48,8 @@ var _scope: State
 var _selected_state: State
 var _pending_from_state: State
 var _pending_to_state: State
-var _editing_transition: StateTransition
-var _selected_transition: StateTransition
+var _editing_transition: Dictionary = {}
+var _selected_transition: Dictionary = {}
 var _renaming_state: State
 var _undo_redo: EditorUndoRedoManager
 var _editor_interface: EditorInterface
@@ -156,7 +156,7 @@ func _change_state_machine(machine: StateMachine) -> void:
 	_state_machine = machine
 	_scope = null
 	_selected_state = null
-	_selected_transition = null
+	_selected_transition.clear()
 	_connect_graph_resource()
 	_rebuild_machine_selector()
 	refresh()
@@ -179,17 +179,12 @@ func edit_resource_object(resource: Resource) -> void:
 		return
 	if resource == _state_machine.definition:
 		_selected_state = null
-		_selected_transition = null
+		_selected_transition.clear()
 	elif resource is State and _belongs_to_machine(resource as State):
 		var state := resource as State
 		_scope = _get_state_parent(state)
 		_selected_state = state
-		_selected_transition = null
-	elif resource is StateTransition and (
-			_state_machine.definition.transitions.has(resource)
-	):
-		_selected_state = null
-		_selected_transition = resource as StateTransition
+		_selected_transition.clear()
 	else:
 		return
 	refresh()
@@ -237,23 +232,24 @@ func refresh() -> void:
 		_selected_state = null
 
 	var states: Array[State] = _get_scope_states()
-	var initial_id: StringName = _get_initial_id()
-	var transitions: Array[StateTransition] = _get_scope_transitions()
+	var initial_name: StringName = _get_initial_name()
+	var transitions: Array[Dictionary] = _get_scope_transitions()
 	var state_names: Dictionary[StringName, String] = {}
 	for state: State in states:
-		state_names[state.stable_id] = str(state.name)
+		state_names[state.editor_uid] = str(state.name)
 
 	var outgoing_by_state: Dictionary = {}
 	var incoming_by_state: Dictionary = {}
-	for transition: StateTransition in transitions:
-		if transition == null:
-			continue
-		if not outgoing_by_state.has(transition.from_state_id):
-			outgoing_by_state[transition.from_state_id] = []
-		outgoing_by_state[transition.from_state_id].append(transition)
-		if not incoming_by_state.has(transition.to_state_id):
-			incoming_by_state[transition.to_state_id] = []
-		incoming_by_state[transition.to_state_id].append(transition)
+	for transition: Dictionary in transitions:
+		var source_uid: StringName = transition[&"source_uid"]
+		var target_uid: StringName = transition[&"target_uid"]
+		if not outgoing_by_state.has(source_uid):
+			outgoing_by_state[source_uid] = []
+		outgoing_by_state[source_uid].append(transition)
+		if not target_uid.is_empty():
+			if not incoming_by_state.has(target_uid):
+				incoming_by_state[target_uid] = []
+			incoming_by_state[target_uid].append(transition)
 
 	for index: int in range(states.size()):
 		var state: State = states[index]
@@ -262,14 +258,14 @@ func refresh() -> void:
 		graph_node.name = graph_node_name
 		graph_node.setup(
 				state,
-				state.stable_id == initial_id,
+				state.name == initial_name,
 				_get_state_transitions(
 						outgoing_by_state,
-						state.stable_id
+						state.editor_uid
 				),
 				_get_state_transitions(
 						incoming_by_state,
-						state.stable_id
+						state.editor_uid
 				)
 		)
 		graph_node.position_offset = _get_state_position(state, index)
@@ -278,23 +274,23 @@ func refresh() -> void:
 		graph_node.position_drag_started.connect(_on_begin_node_move)
 		graph_node.position_drag_finished.connect(_on_end_node_move)
 		_graph_edit.add_child(graph_node)
-		_node_names_by_state_id[state.stable_id] = graph_node_name
+		_node_names_by_state_id[state.editor_uid] = graph_node_name
 		_states_by_node_name[graph_node_name] = state
-		_graph_nodes_by_state_id[state.stable_id] = graph_node
+		_graph_nodes_by_state_id[state.editor_uid] = graph_node
 
-	for transition: StateTransition in transitions:
-		if transition == null:
-			continue
+	for transition: Dictionary in transitions:
+		var source_uid: StringName = transition[&"source_uid"]
+		var target_uid: StringName = transition[&"target_uid"]
 		if (
-			not _node_names_by_state_id.has(transition.from_state_id)
-			or not _node_names_by_state_id.has(transition.to_state_id)
+			not _node_names_by_state_id.has(source_uid)
+			or not _node_names_by_state_id.has(target_uid)
 		):
 			continue
 		var source_node: GStateGraphNode = _graph_nodes_by_state_id[
-				transition.from_state_id
+				source_uid
 		]
 		var target_node: GStateGraphNode = _graph_nodes_by_state_id[
-				transition.to_state_id
+				target_uid
 		]
 		_graph_edit.connect_node(
 				source_node.name,
@@ -449,9 +445,9 @@ func _create_state(parent: Variant, enter_child_scope: bool) -> void:
 	new_states.append(state)
 	var initial_owner: Object = state_owner
 	var initial_property := (
-			&"initial_state_id"
+			&"initial_state"
 			if parent == null
-			else &"initial_child_id"
+			else &"initial_child"
 	)
 	var old_initial: StringName = initial_owner.get(initial_property)
 	var should_set_initial := old_states.is_empty()
@@ -466,7 +462,7 @@ func _create_state(parent: Variant, enter_child_scope: bool) -> void:
 		_undo_redo.add_do_property(
 				initial_owner,
 				initial_property,
-				state.stable_id
+				state.name
 		)
 	_undo_redo.add_do_method(
 			_state_machine.graph,
@@ -583,13 +579,13 @@ func _set_initial_state(state: State) -> void:
 			_state_machine.definition if _scope == null else _scope
 	)
 	var property := (
-			&"initial_state_id" if _scope == null else &"initial_child_id"
+			&"initial_state" if _scope == null else &"initial_child"
 	)
 	var old_value: StringName = owner.get(property)
-	if old_value == state.stable_id:
+	if old_value == state.name:
 		return
 	_undo_redo.create_action("GState: Set Initial State")
-	_undo_redo.add_do_property(owner, property, state.stable_id)
+	_undo_redo.add_do_property(owner, property, state.name)
 	_undo_redo.add_do_method(self, &"refresh")
 	_undo_redo.add_undo_property(owner, property, old_value)
 	_undo_redo.add_undo_method(self, &"refresh")
@@ -609,49 +605,54 @@ func _delete_selected_state() -> void:
 	var new_states: Array[State] = old_states.duplicate()
 	new_states.erase(state)
 	_ensure_graph()
-	var removed_ids: Dictionary[StringName, bool] = {}
-	_collect_state_ids(state, removed_ids)
+	var removed_uids: Dictionary[StringName, bool] = {}
+	_collect_state_uids(state, removed_uids)
 
-	var old_transitions: Array[StateTransition] = (
-			_state_machine.graph.transitions.duplicate()
-	)
-	var new_transitions: Array[StateTransition] = []
-	for transition: StateTransition in old_transitions:
-		if (
-			transition != null
-			and not removed_ids.has(transition.scope_id)
-			and not removed_ids.has(transition.from_state_id)
-			and not removed_ids.has(transition.to_state_id)
-		):
-			new_transitions.append(transition)
+	var transition_changes: Array[Dictionary] = []
+	for candidate: State in old_states:
+		if candidate == null or candidate == state:
+			continue
+		var old_map: Dictionary = candidate.transitions.duplicate(true)
+		var new_map: Dictionary = old_map.duplicate(true)
+		for event: StringName in old_map:
+			var target_name: StringName = old_map[event]
+			if target_name == state.name:
+				new_map.erase(event)
+		if new_map != old_map:
+			transition_changes.append({
+				&"state": candidate,
+				&"old": old_map,
+				&"new": new_map,
+			})
 
 	var old_positions: Dictionary = (
 			_state_machine.graph.editor_positions.duplicate(true)
 	)
 	var new_positions: Dictionary = old_positions.duplicate(true)
-	for id: StringName in removed_ids:
-		new_positions.erase(id)
+	for uid: StringName in removed_uids:
+		new_positions.erase(uid)
 
 	var initial_owner: Object = (
 			parent if parent != null else _state_machine.definition
 	)
 	var initial_property := (
-			&"initial_state_id"
+			&"initial_state"
 			if parent == null
-			else &"initial_child_id"
+			else &"initial_child"
 	)
 	var old_initial: StringName = initial_owner.get(initial_property)
 	var new_initial: StringName = old_initial
-	if removed_ids.has(old_initial):
-		new_initial = new_states[0].stable_id if not new_states.is_empty() else &""
+	if old_initial == state.name:
+		new_initial = new_states[0].name if not new_states.is_empty() else &""
 
 	_undo_redo.create_action("GState: Delete State")
 	_undo_redo.add_do_property(state_owner, states_property, new_states)
-	_undo_redo.add_do_property(
-			_state_machine.graph,
-			&"transitions",
-			new_transitions
-	)
+	for change: Dictionary in transition_changes:
+		_undo_redo.add_do_property(
+				change[&"state"],
+				&"transitions",
+				change[&"new"]
+		)
 	_undo_redo.add_do_property(
 			_state_machine.graph,
 			&"editor_positions",
@@ -668,11 +669,12 @@ func _delete_selected_state() -> void:
 			&"editor_positions",
 			old_positions
 	)
-	_undo_redo.add_undo_property(
-			_state_machine.graph,
-			&"transitions",
-			old_transitions
-	)
+	for change: Dictionary in transition_changes:
+		_undo_redo.add_undo_property(
+				change[&"state"],
+				&"transitions",
+				change[&"old"]
+		)
 	_undo_redo.add_undo_method(self, &"refresh")
 	_undo_redo.add_undo_reference(state)
 	_undo_redo.commit_action()
@@ -698,7 +700,7 @@ func _request_transition(
 		return
 	_pending_from_state = _states_by_node_name[from_node]
 	_pending_to_state = _states_by_node_name[to_node]
-	_editing_transition = null
+	_editing_transition.clear()
 	_transition_dialog.title = "Create Transition"
 	_transition_dialog.ok_button_text = "Create"
 	_event_edit.clear()
@@ -716,19 +718,12 @@ func _validate_pending_event(text: String) -> void:
 	elif not is_instance_valid(_pending_from_state):
 		error = "The transition source State no longer exists."
 	elif (
-		_state_machine != null
-		and _state_machine.graph != null
-		and _pending_from_state != null
-		and _state_machine.graph.find_transition(
-				_get_scope_id(),
-				_pending_from_state.stable_id,
-				event_name
-		) != null
-		and _state_machine.graph.find_transition(
-				_get_scope_id(),
-				_pending_from_state.stable_id,
-				event_name
-		) != _editing_transition
+		is_instance_valid(_pending_from_state)
+		and _pending_from_state.transitions.has(event_name)
+		and (
+			_editing_transition.is_empty()
+			or _editing_transition.get(&"event", &"") != event_name
+		)
 	):
 		error = "This source already has a '%s' transition." % event_name
 	_transition_error.text = error
@@ -736,7 +731,7 @@ func _validate_pending_event(text: String) -> void:
 
 
 func _confirm_transition_dialog() -> void:
-	if _editing_transition != null:
+	if not _editing_transition.is_empty():
 		_update_transition_event()
 	else:
 		_create_pending_transition()
@@ -753,23 +748,22 @@ func _create_pending_transition() -> void:
 	if event_name.is_empty():
 		return
 	_ensure_graph()
-	var transition := StateTransition.new(
-			_pending_from_state.stable_id,
-			_pending_to_state.stable_id,
-			event_name,
-			_get_scope_id()
+	var old_transitions: Dictionary = (
+			_pending_from_state.transitions.duplicate(true)
 	)
+	var new_transitions: Dictionary = old_transitions.duplicate(true)
+	new_transitions[event_name] = _pending_to_state.name
 	_selected_state = null
 	_undo_redo.create_action("GState: Add Transition")
-	_undo_redo.add_do_method(
-			_state_machine.graph,
-			&"add_transition",
-			transition
+	_undo_redo.add_do_property(
+			_pending_from_state,
+			&"transitions",
+			new_transitions
 	)
-	_undo_redo.add_undo_method(
-			_state_machine.graph,
-			&"remove_transition",
-			transition
+	_undo_redo.add_undo_property(
+			_pending_from_state,
+			&"transitions",
+			old_transitions
 	)
 	_undo_redo.commit_action()
 
@@ -777,18 +771,18 @@ func _create_pending_transition() -> void:
 func _edit_selected_transition() -> void:
 	if _transition_option.selected < 0 or _transition_option.item_count == 0:
 		return
-	var transition: StateTransition = _transition_option.get_item_metadata(
+	var transition: Dictionary = _transition_option.get_item_metadata(
 			_transition_option.selected
 	)
-	if transition == null:
+	if transition.is_empty():
 		return
 	_selected_state = null
-	_editing_transition = transition
-	_pending_from_state = _find_state_by_id(transition.from_state_id)
-	_pending_to_state = _find_state_by_id(transition.to_state_id)
+	_editing_transition = transition.duplicate()
+	_pending_from_state = transition[&"source"] as State
+	_pending_to_state = _find_scope_state_by_name(transition[&"target_name"])
 	_transition_dialog.title = "Edit Transition"
 	_transition_dialog.ok_button_text = "Save"
-	_event_edit.text = str(transition.event)
+	_event_edit.text = str(transition[&"event"])
 	_validate_pending_event(_event_edit.text)
 	_transition_dialog.popup_centered(Vector2i(380, 150))
 	_event_edit.select_all()
@@ -796,22 +790,29 @@ func _edit_selected_transition() -> void:
 
 
 func _update_transition_event() -> void:
-	if _editing_transition == null or _undo_redo == null:
+	if _editing_transition.is_empty() or _undo_redo == null:
 		return
 	var new_event := StringName(_event_edit.text.strip_edges())
-	var old_event: StringName = _editing_transition.event
+	var old_event: StringName = _editing_transition[&"event"]
 	if new_event.is_empty():
 		return
 	if new_event == old_event:
-		_editing_transition = null
+		_editing_transition.clear()
 		return
+	var source := _editing_transition[&"source"] as State
+	if not is_instance_valid(source):
+		_editing_transition.clear()
+		return
+	var old_transitions: Dictionary = source.transitions.duplicate(true)
+	var new_transitions: Dictionary = old_transitions.duplicate(true)
+	var target_name: StringName = new_transitions.get(old_event, &"")
+	new_transitions.erase(old_event)
+	new_transitions[new_event] = target_name
 	_undo_redo.create_action("GState: Edit Transition")
-	_undo_redo.add_do_property(_editing_transition, &"event", new_event)
-	_undo_redo.add_do_method(_state_machine.graph, &"emit_changed")
-	_undo_redo.add_undo_property(_editing_transition, &"event", old_event)
-	_undo_redo.add_undo_method(_state_machine.graph, &"emit_changed")
+	_undo_redo.add_do_property(source, &"transitions", new_transitions)
+	_undo_redo.add_undo_property(source, &"transitions", old_transitions)
 	_undo_redo.commit_action()
-	_editing_transition = null
+	_editing_transition.clear()
 
 
 func _delete_selected_transition() -> void:
@@ -821,23 +822,22 @@ func _delete_selected_transition() -> void:
 		or _transition_option.item_count == 0
 	):
 		return
-	var transition: StateTransition = _transition_option.get_item_metadata(
+	var transition: Dictionary = _transition_option.get_item_metadata(
 			_transition_option.selected
 	)
-	if transition == null:
+	if transition.is_empty():
 		return
-	_selected_transition = null
+	var source := transition[&"source"] as State
+	if not is_instance_valid(source):
+		return
+	var event: StringName = transition[&"event"]
+	var old_transitions: Dictionary = source.transitions.duplicate(true)
+	var new_transitions: Dictionary = old_transitions.duplicate(true)
+	new_transitions.erase(event)
+	_selected_transition.clear()
 	_undo_redo.create_action("GState: Delete Transition")
-	_undo_redo.add_do_method(
-			_state_machine.graph,
-			&"remove_transition",
-			transition
-	)
-	_undo_redo.add_undo_method(
-			_state_machine.graph,
-			&"add_transition",
-			transition
-	)
+	_undo_redo.add_do_property(source, &"transitions", new_transitions)
+	_undo_redo.add_undo_property(source, &"transitions", old_transitions)
 	_undo_redo.commit_action()
 
 
@@ -854,7 +854,7 @@ func _on_graph_node_selected(node: Node) -> void:
 		return
 	if node is GStateGraphNode:
 		_selected_state = (node as GStateGraphNode).state
-		_selected_transition = null
+		_selected_transition.clear()
 		_update_action_buttons()
 		_update_context_inspector()
 		_select_state_in_editor.call_deferred(_selected_state)
@@ -906,7 +906,7 @@ func _on_end_node_move() -> void:
 	for child: Node in _graph_edit.get_children():
 		if child is GStateGraphNode:
 			var graph_node := child as GStateGraphNode
-			new_positions[graph_node.state.stable_id] = graph_node.position_offset
+			new_positions[graph_node.state.editor_uid] = graph_node.position_offset
 	if new_positions == _positions_before_move:
 		return
 	if _undo_redo == null:
@@ -999,23 +999,25 @@ func _rebuild_breadcrumb() -> void:
 
 
 func _rebuild_transition_options(
-		transitions: Array[StateTransition],
+		transitions: Array[Dictionary],
 		state_names: Dictionary
 ) -> void:
 	_transition_option.clear()
-	for transition: StateTransition in transitions:
-		if transition == null:
-			continue
+	for transition: Dictionary in transitions:
+		var source_uid: StringName = transition[&"source_uid"]
+		var target_uid: StringName = transition[&"target_uid"]
+		var target_name: StringName = transition[&"target_name"]
+		var event: StringName = transition[&"event"]
 		var from_name: String = state_names.get(
-				transition.from_state_id,
-				str(transition.from_state_id)
+				source_uid,
+				str((transition[&"source"] as State).name)
 		)
 		var to_name: String = state_names.get(
-				transition.to_state_id,
-				str(transition.to_state_id)
+				target_uid,
+				str(target_name)
 		)
 		_transition_option.add_item(
-				"%s: %s → %s" % [transition.event, from_name, to_name]
+				"%s: %s → %s" % [event, from_name, to_name]
 		)
 		_transition_option.set_item_metadata(
 				_transition_option.item_count - 1,
@@ -1031,9 +1033,8 @@ func _on_transition_selected(_index: int) -> void:
 	_selected_state = null
 	_selected_transition = (
 		_transition_option.get_item_metadata(_transition_option.selected)
-		as StateTransition
 		if _transition_option.item_count > 0
-		else null
+		else {}
 	)
 	_update_action_buttons()
 	_update_context_inspector()
@@ -1042,10 +1043,10 @@ func _on_transition_selected(_index: int) -> void:
 func _update_context_inspector() -> void:
 	if _context_inspector == null:
 		return
-	var target: Object = _state_machine
-	_inspector_title.text = "State Machine"
+	var target: Object = _state_machine.definition
+	_inspector_title.text = "State Machine Resource"
 	_connectable_targets.text = (
-			"Assign or save Definition as a .tres resource to reuse this graph."
+			"Context, states, and graph settings are saved together in this .tres."
 	)
 	if is_instance_valid(_selected_state):
 		target = _selected_state
@@ -1058,16 +1059,17 @@ func _update_context_inspector() -> void:
 		_connectable_targets.text = (
 			"Can connect to (same scope): %s" % ", ".join(names)
 		)
-	elif is_instance_valid(_selected_transition):
+	elif not _selected_transition.is_empty():
 		var transition := _selected_transition
-		if transition != null:
-			target = transition
-			_inspector_title.text = "Transition · %s" % transition.event
-			var from_state := _find_state_by_id(transition.from_state_id)
-			var to_state := _find_state_by_id(transition.to_state_id)
+		var from_state := transition[&"source"] as State
+		if is_instance_valid(from_state):
+			target = from_state
+			var event: StringName = transition[&"event"]
+			var target_name: StringName = transition[&"target_name"]
+			_inspector_title.text = "Transition · %s" % event
 			_connectable_targets.text = "%s → %s" % [
-				from_state.name if from_state != null else transition.from_state_id,
-				to_state.name if to_state != null else transition.to_state_id,
+				from_state.name,
+				target_name,
 			]
 	_context_inspector.edit(target)
 
@@ -1099,36 +1101,40 @@ func _get_scope_parent() -> Variant:
 	return _scope
 
 
-func _get_scope_id() -> StringName:
+func _get_initial_name() -> StringName:
 	return (
-			_scope.stable_id
+			_scope.initial_child
 			if _scope != null
-			else StateTransition.ROOT_SCOPE_ID
+			else _state_machine.definition.initial_state
 	)
 
 
-func _get_initial_id() -> StringName:
-	return (
-			_scope.initial_child_id
-			if _scope != null
-			else _state_machine.initial_state_id
-	)
-
-
-func _get_scope_transitions() -> Array[StateTransition]:
-	if _state_machine.graph == null:
-		return []
-	return _state_machine.graph.get_transitions_for_scope(_get_scope_id())
+func _get_scope_transitions() -> Array[Dictionary]:
+	var result: Array[Dictionary] = []
+	for source: State in _get_scope_states():
+		if source == null:
+			continue
+		for event: StringName in source.transitions:
+			var target_name: StringName = source.transitions[event]
+			var target := _find_scope_state_by_name(target_name)
+			result.append({
+				&"source": source,
+				&"source_uid": source.editor_uid,
+				&"target_uid": target.editor_uid if target != null else &"",
+				&"target_name": target_name,
+				&"event": event,
+			})
+	return result
 
 
 func _get_state_transitions(
 		transitions_by_state: Dictionary,
 		state_id: StringName
-) -> Array[StateTransition]:
-	var result: Array[StateTransition] = []
+) -> Array[Dictionary]:
+	var result: Array[Dictionary] = []
 	if not transitions_by_state.has(state_id):
 		return result
-	for transition: StateTransition in transitions_by_state[state_id]:
+	for transition: Dictionary in transitions_by_state[state_id]:
 		result.append(transition)
 	return result
 
@@ -1161,10 +1167,10 @@ func _restore_graph_view() -> void:
 func _restore_graph_selection() -> void:
 	if (
 		_selected_state != null
-		and _node_names_by_state_id.has(_selected_state.stable_id)
+		and _node_names_by_state_id.has(_selected_state.editor_uid)
 	):
 		var node: Node = _graph_edit.get_node(
-				NodePath(str(_node_names_by_state_id[_selected_state.stable_id]))
+				NodePath(str(_node_names_by_state_id[_selected_state.editor_uid]))
 		)
 		_graph_edit.set_selected(node)
 
@@ -1200,9 +1206,9 @@ func _update_status(state_count: int, transition_count: int) -> void:
 
 func _update_scope_summary(states: Array[State]) -> void:
 	var initial_name := "Not set"
-	var initial_id: StringName = _get_initial_id()
+	var wanted_initial: StringName = _get_initial_name()
 	for state: State in states:
-		if state.stable_id == initial_id:
+		if state.name == wanted_initial:
 			initial_name = str(state.name)
 			break
 
@@ -1232,24 +1238,10 @@ func _update_scope_summary(states: Array[State]) -> void:
 
 func _get_scope_exit_events() -> PackedStringArray:
 	var result := PackedStringArray()
-	if _scope == null or _state_machine.graph == null:
+	if _scope == null:
 		return result
-	var parent_state := _get_state_parent(_scope)
-	var parent_scope_id := (
-			parent_state.stable_id
-			if parent_state != null
-			else StateTransition.ROOT_SCOPE_ID
-	)
-	var parent_transitions: Array[StateTransition] = (
-			_state_machine.graph.get_transitions_for_scope(parent_scope_id)
-	)
-	for transition: StateTransition in parent_transitions:
-		if (
-			transition != null
-			and transition.from_state_id == _scope.stable_id
-			and not result.has(str(transition.event))
-		):
-			result.append(str(transition.event))
+	for event: StringName in _scope.transitions:
+		result.append(str(event))
 	return result
 
 
@@ -1350,19 +1342,20 @@ func _mark_scene_unsaved() -> void:
 		_editor_interface.mark_scene_as_unsaved()
 
 
-func _find_state_by_id(state_id: StringName) -> State:
-	if _state_machine == null:
-		return null
-	return _state_machine.definition.find_state(state_id)
+func _find_scope_state_by_name(state_name: StringName) -> State:
+	for state: State in _get_scope_states():
+		if state != null and state.name == state_name:
+			return state
+	return null
 
 
-func _collect_state_ids(
+func _collect_state_uids(
 		state: State,
 		result: Dictionary[StringName, bool]
 ) -> void:
-	result[state.stable_id] = true
+	result[state.editor_uid] = true
 	for child: State in state.get_state_children():
-		_collect_state_ids(child, result)
+		_collect_state_uids(child, result)
 
 
 func _is_ancestor_state(ancestor: State, state: State) -> bool:

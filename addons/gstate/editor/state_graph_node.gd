@@ -20,8 +20,8 @@ const PANEL_TINT_STRENGTH := 0.22
 const TITLE_TINT_STRENGTH := 0.42
 
 var state: State
-var _outgoing_transitions: Array[StateTransition] = []
-var _incoming_transitions: Array[StateTransition] = []
+var _outgoing_transitions: Array[Dictionary] = []
+var _incoming_transitions: Array[Dictionary] = []
 var _drag_candidate: bool = false
 var _dragging: bool = false
 var _press_global_position: Vector2
@@ -35,8 +35,8 @@ func _ready() -> void:
 func setup(
 		state_value: State,
 		is_initial: bool,
-		outgoing: Array[StateTransition],
-		incoming: Array[StateTransition]
+		outgoing: Array[Dictionary],
+		incoming: Array[Dictionary]
 ) -> void:
 	state = state_value
 	_outgoing_transitions = outgoing
@@ -118,12 +118,12 @@ func _override_state_style(
 	add_theme_stylebox_override(theme_name, style)
 
 
-func get_transition_output_port(transition: StateTransition) -> int:
+func get_transition_output_port(transition: Dictionary) -> int:
 	var index := _outgoing_transitions.find(transition)
 	return index if index >= 0 else 0
 
 
-func get_transition_input_port(transition: StateTransition) -> int:
+func get_transition_input_port(transition: Dictionary) -> int:
 	var index := _incoming_transitions.find(transition)
 	return index if index >= 0 else 0
 
@@ -139,8 +139,8 @@ func _create_port_header() -> Control:
 
 func _create_port_row(
 		index: int,
-		incoming: Array[StateTransition],
-		outgoing: Array[StateTransition]
+		incoming: Array[Dictionary],
+		outgoing: Array[Dictionary]
 ) -> Control:
 	var row := HBoxContainer.new()
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -151,7 +151,9 @@ func _create_port_row(
 			str(index) if index < maxi(1, incoming.size()) else ""
 	)
 	var output_text := (
-			str(outgoing[index].event) if index < outgoing.size() else ""
+			str(outgoing[index].get(&"event", &""))
+			if index < outgoing.size()
+			else ""
 	)
 	row.add_child(_create_port_label(input_text, IN_PORT_COLOR, false))
 	row.add_child(_create_port_label(output_text, OUT_PORT_COLOR, true))
@@ -196,7 +198,7 @@ func _get_kind_text(is_initial: bool) -> String:
 func _build_tooltip(is_initial: bool) -> String:
 	var lines := PackedStringArray([
 		"State: %s" % state.name,
-		"Stable ID: %s" % state.stable_id,
+		"Outgoing events: %d" % state.transitions.size(),
 	])
 	if is_initial:
 		lines.append("Initial state in this scope")

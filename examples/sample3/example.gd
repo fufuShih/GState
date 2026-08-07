@@ -29,9 +29,9 @@ func _ready() -> void:
 	if not state_manager.start():
 		state_label.text = "GState failed to start — check Issues or Output"
 		return
-	if _get_session_context() == null:
-		state_label.text = "SessionContext is missing"
-		push_error("Example requires Session.initial_context to be SessionContext.")
+	if _get_session_context().is_empty():
+		state_label.text = "Session context is missing"
+		push_error("Example requires context entries in session_machine.tres.")
 		return
 
 	_refresh_ui()
@@ -72,11 +72,11 @@ func _start_round() -> bool:
 	if not session.send(&"start"):
 		return false
 	var context := _get_session_context()
-	if context == null:
+	if context.is_empty():
 		return false
-	context.round += 1
-	context.round_score = 0
-	context.last_gain = 0
+	context[&"round"] = int(context.get(&"round", 0)) + 1
+	context[&"round_score"] = 0
+	context[&"last_gain"] = 0
 	_update_context_label(context)
 	return true
 
@@ -85,11 +85,11 @@ func _add_score(amount: int) -> bool:
 	if not session.send(&"score", {"amount": amount}):
 		return false
 	var context := _get_session_context()
-	if context == null:
+	if context.is_empty():
 		return false
-	context.round_score += amount
-	context.total_score += amount
-	context.last_gain = amount
+	context[&"round_score"] = int(context.get(&"round_score", 0)) + amount
+	context[&"total_score"] = int(context.get(&"total_score", 0)) + amount
+	context[&"last_gain"] = amount
 	_update_context_label(context)
 	return true
 
@@ -97,13 +97,13 @@ func _add_score(amount: int) -> bool:
 func _refresh_ui() -> void:
 	_update_state_label(session.get_active_path())
 	var context := _get_session_context()
-	if context != null:
+	if not context.is_empty():
 		_update_context_label(context)
 	_update_help_position.call_deferred()
 
 
-func _get_session_context() -> SessionContext:
-	return session.get_context() as SessionContext
+func _get_session_context() -> Dictionary:
+	return session.get_context()
 
 
 func _update_state_label(path: Array[State]) -> void:
@@ -113,7 +113,7 @@ func _update_state_label(path: Array[State]) -> void:
 	state_label.text = "Current State: %s" % "/".join(names)
 
 
-func _update_context_label(context: SessionContext) -> void:
+func _update_context_label(context: Dictionary) -> void:
 	context_label.text = (
 			"SessionContext\n"
 			+ "round: %d\n"
@@ -121,10 +121,10 @@ func _update_context_label(context: SessionContext) -> void:
 			+ "total_score: %d\n"
 			+ "last_gain: %d"
 	) % [
-		context.round,
-		context.round_score,
-		context.total_score,
-		context.last_gain,
+		context.get(&"round", 0),
+		context.get(&"round_score", 0),
+		context.get(&"total_score", 0),
+		context.get(&"last_gain", 0),
 	]
 	_update_help_position.call_deferred()
 

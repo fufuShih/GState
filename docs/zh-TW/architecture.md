@@ -38,6 +38,14 @@ State 的 `children` 包含其他 State 時會自動成為 Compound State。
 StateMachine 啟動時會深複製定義樹，所以多台 Machine 可以安全共用同一
 份 `.tres`。
 
+每個 State 也擁有自己的 `transitions` Dictionary：key 是 Event 名稱，
+value 是同一 Scope 內的目標 State 名稱。來源與 Scope 都能從 State
+階層推導，因此不用同步維護另一份 Transition 陣列或公開隨機 ID。
+
+`StateMachineResource.context` 是與 State 樹一起存進 `.tres` 的
+Dictionary。Machine 啟動時會 deep-copy；同一台 Machine 的 State 共用
+runtime copy，不同 Machine 之間則彼此隔離。
+
 簡單判斷方式：
 
 ```text

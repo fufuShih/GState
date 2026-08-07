@@ -44,7 +44,12 @@ These operations edit `StateMachine.definition`; they do not create State
 scene children. Select Main, then use Definition's resource menu in the
 Inspector to save it as `main_state_machine.tres`. Assign that asset to other
 StateMachine nodes to reuse it. The Graph-side Inspector edits the selected
-State or Transition and lists valid same-scope connection targets.
+State and lists valid same-scope connection targets. Selecting a connection
+focuses its source State, where the transition map is stored.
+
+The State's `Transitions` property displays one row per connection with an
+Event field, a same-scope Target dropdown, and a delete button. Use
+`+ Add Transition` to configure connections without copying internal IDs.
 
 ## 3. Create transitions
 
