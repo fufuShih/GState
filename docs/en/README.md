@@ -28,6 +28,8 @@ outgoing event-to-target transition map.
 - Dictionary context shared by states in one machine
 - `enter()`, `exit()`, `update()`, and `physics_update()`
 - Graph Editor operations with Undo/Redo
+- Godot Inspector integration for graph selections
+- Definition New, Inspect, Save As, and Make Unique actions
 - Inspector transition rows with same-scope Target dropdowns
 
 ## Not yet supported

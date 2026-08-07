@@ -41,11 +41,13 @@ The first State in each scope automatically becomes its initial state. You can
 select another State and click `Set Initial` to change it.
 
 These operations edit `StateMachine.definition`; they do not create State
-scene children. Select Main, then use Definition's resource menu in the
-Inspector to save it as `main_state_machine.tres`. Assign that asset to other
-StateMachine nodes to reuse it. The Graph-side Inspector edits the selected
-State and lists valid same-scope connection targets. Selecting a connection
-focuses its source State, where the transition map is stored.
+scene children. The Definition row above the graph shows whether the Resource
+is embedded in the scene or saved as an external asset. Use `Save As...` to
+save it as `main_state_machine.tres`, then assign that asset to other
+StateMachine nodes to reuse it. Use `Make Unique` before changing one machine
+that currently shares a definition. Selecting a State in the graph opens that
+resource in Godot's Inspector. Selecting a transition opens its source State,
+where the transition map is stored.
 
 The State's `Transitions` property displays one row per connection with an
 Event field, a same-scope Target dropdown, and a delete button. Use

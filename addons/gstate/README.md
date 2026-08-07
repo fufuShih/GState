@@ -124,8 +124,9 @@ below it displays only that machine's current State scope:
 - Nodes only begin dragging from the titlebar after a short movement threshold.
 - State, transition, initial, and position edits support Undo/Redo.
 - Selecting a graph node opens its Resource properties in the Inspector.
-- The Graph-side Inspector shows the machine Resource or selected State and
-  valid same-scope targets. A selected connection edits its source State.
+- The Definition row can create, inspect, save, or duplicate the current
+  StateMachineResource without using the Inspector resource menu.
+- A selected transition opens its source State in Godot's native Inspector.
 - A State's Transitions property uses Event fields and same-scope Target
   dropdowns; `+ Add Transition` and delete work without entering internal IDs.
 - Validation issues can be opened from the `Issues` button.

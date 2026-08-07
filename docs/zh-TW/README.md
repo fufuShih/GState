@@ -28,7 +28,8 @@ Graph Editor 資料都儲存在可重用的 `StateMachineResource`（`.tres`）�
 - 同一台 Machine 內共用的 Context Dictionary
 - `enter()`、`exit()`、`update()` 與 `physics_update()`
 - Graph Editor 與 Undo/Redo
-- Graph 右側的 Machine Resource／State 屬性與可連線目標檢視器
+- Graph 選取項目與 Godot 原生 Inspector 整合
+- Definition 的 New、Inspect、Save As 與 Make Unique 操作
 - Inspector 的 Event 欄位與同 Scope Target 下拉選單
 
 ## 尚未支援

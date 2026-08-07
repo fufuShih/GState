@@ -200,6 +200,20 @@ func _run() -> void:
 	get_root().add_child(graph_view)
 	graph_view.set_state_manager(manager)
 	_expect(
+		graph_view.find_child("InspectorPanel", true, false) == null,
+		"Graph Editor relies on Godot's native Inspector"
+	)
+	_expect(
+		graph_view.find_child("DefinitionPath", true, false) != null
+		and graph_view.find_child(
+				"SaveDefinitionButton",
+				true,
+				false
+		) != null
+		and graph_view.find_child("MakeUniqueButton", true, false) != null,
+		"Graph Editor exposes the Definition resource workflow"
+	)
+	_expect(
 		_count_graph_nodes(graph_view) == 3,
 		"root graph view displays direct child states"
 	)
@@ -209,6 +223,13 @@ func _run() -> void:
 	)
 	var grounded_graph_node := _find_graph_node(graph_view, grounded)
 	var dead_graph_node := _find_graph_node(graph_view, dead)
+	_expect(
+		grounded_graph_node != null
+		and _get_graph_edit(graph_view).get_state_for_node(
+				grounded_graph_node.name
+		) == grounded,
+		"Graph Canvas owns State node lookup data"
+	)
 	_expect(
 		grounded_graph_node != null
 		and grounded_graph_node.get_output_port_count() == 2,
@@ -279,6 +300,35 @@ func _run() -> void:
 	)
 	graph_view.queue_free()
 
+	var resource_machine := StateMachine.new()
+	resource_machine.definition.context = {&"speed": 10.0}
+	var resource_state := State.new()
+	resource_state.name = &"Ready"
+	resource_machine.definition.add_state(resource_state)
+	var original_definition := resource_machine.definition
+	var resource_editor: GStateMachineEditor = (
+		StateMachineEditorScene.instantiate()
+	)
+	get_root().add_child(resource_editor)
+	resource_editor.set_state_machine(resource_machine)
+	var definition_toolbar := resource_editor.get_node("%DefinitionRow")
+	definition_toolbar._make_definition_unique()
+	_expect(
+		resource_machine.definition != original_definition
+		and resource_machine.definition.states.size() == 1
+		and resource_machine.definition.states[0] != resource_state,
+		"Make Unique deep-copies the complete definition"
+	)
+	definition_toolbar._replace_with_new_definition()
+	_expect(
+		resource_machine.definition.states.is_empty()
+		and resource_machine.definition.context.is_empty()
+		and original_definition.states.size() == 1,
+		"New Definition replaces without mutating the previous Resource"
+	)
+	resource_editor.queue_free()
+	resource_machine.free()
+
 	idle.transitions[&""] = run.name
 	idle.transitions[&"launch"] = airborne.name
 	var invalid_result: Dictionary = machine.validate()
@@ -348,8 +398,8 @@ func _expect_calls(expected: Array[String], label: String) -> void:
 	_expect(_calls == expected, "%s: got %s" % [label, _calls])
 
 
-func _get_graph_edit(editor: GStateMachineEditor) -> GraphEdit:
-	return editor.get_node("%GraphEdit") as GraphEdit
+func _get_graph_edit(editor: GStateMachineEditor):
+	return editor.get_node("%GraphEdit")
 
 
 func _count_graph_nodes(editor: GStateMachineEditor) -> int:

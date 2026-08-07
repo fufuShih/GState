@@ -12,6 +12,8 @@ resource as `.tres` to reuse the same definition across scenes.
 - Dictionary context shared by states in one machine
 - State lifecycle hooks and active-path queries
 - Graph editing with Undo/Redo support
+- Graph selections open in Godot's native Inspector
+- Definition New, Inspect, Save As, and Make Unique workflow
 - Inspector transition rows with Event fields and same-scope Target dropdowns
 
 ## Documentation

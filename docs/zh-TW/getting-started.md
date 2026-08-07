@@ -41,15 +41,15 @@ Example (Node2D)
 後按 `Set Initial` 修改。
 
 所有操作都會寫入 `StateMachine.definition`，不會在 Main 底下建立
-State 子節點。選取 Main 後，可在 Inspector 展開 Definition，使用資源
-選單的 **Save As** 存成 `main_state_machine.tres`。其他場景只要把同一
-份資源指派給 StateMachine，就能共用相同定義；每台 Machine 的 runtime
-State 仍會各自複製，不會互相污染。
+State 子節點。Graph 上方的 Definition 列會顯示目前是內嵌資源或外部
+`.tres`；按 **Save As...** 可存成 `main_state_machine.tres`。其他場景
+只要把同一份資源指派給 StateMachine，就能共用相同定義；若只想修改
+其中一台，先按 **Make Unique**。每台 Machine 的 runtime State 仍會
+各自複製，不會互相污染。
 
-Graph 右側 Inspector 會顯示整台 Machine Resource 或選取的 State；選取
-連線時會聚焦它的來源 State，因為 Transition 就存放在該 State 的
-`transitions` 欄位。選取 State 時也會列出同一 Scope 中可以合法連線的
-目標。
+在 Graph 選取 State 時，Godot 原生 Inspector 會直接開啟該資源；選取
+Transition 時則會開啟它的來源 State，因為 Transition 就存放在該
+State 的 `transitions` 欄位。
 
 State 的 `Transitions` 屬性會為每條連線顯示 Event 欄位、同 Scope
 Target 下拉選單與刪除按鈕；使用 `+ Add Transition` 就能新增，不需要
