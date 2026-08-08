@@ -1,0 +1,77 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://examples/example4/example.gd" id="1_example"]
+[ext_resource type="Script" uid="uid://b6iwt8dhfr5ua" path="res://addons/gstate/runtime/state_manager.gd" id="2_manager"]
+[ext_resource type="Script" uid="uid://i50by6xe6v2e" path="res://addons/gstate/runtime/state_machine.gd" id="3_machine"]
+[ext_resource type="Script" uid="uid://58h5uoomsyew" path="res://addons/gstate/runtime/state_machine_graph.gd" id="4_graph"]
+[ext_resource type="Script" uid="uid://cmc34giy7r8q4" path="res://addons/gstate/runtime/state_transition.gd" id="5_transition"]
+[ext_resource type="Script" path="res://examples/example4/action_state.gd" id="6_action_state"]
+
+[sub_resource type="Resource" id="Transition_activate"]
+script = ExtResource("5_transition")
+id = &"transition_activate"
+from_state_id = &"state_idle"
+to_state_id = &"state_active"
+event = &"toggle"
+action = &"record_toggle"
+
+[sub_resource type="Resource" id="Transition_idle"]
+script = ExtResource("5_transition")
+id = &"transition_idle"
+from_state_id = &"state_active"
+to_state_id = &"state_idle"
+event = &"toggle"
+action = &"record_toggle"
+
+[sub_resource type="Resource" id="ActionDemoGraph"]
+script = ExtResource("4_graph")
+transitions = Array[ExtResource("5_transition")]([SubResource("Transition_activate"), SubResource("Transition_idle")])
+editor_positions = {
+&"state_active": Vector2(700, 120),
+&"state_idle": Vector2(160, 120)
+}
+
+[node name="ActionExample" type="Node2D"]
+script = ExtResource("1_example")
+
+[node name="TitleLabel" type="Label" parent="."]
+offset_left = 8.0
+offset_top = 8.0
+offset_right = 320.0
+offset_bottom = 36.0
+theme_override_font_sizes/font_size = 20
+text = "GState Transition Action Example"
+
+[node name="StatusLabel" type="Label" parent="."]
+offset_left = 8.0
+offset_top = 52.0
+offset_right = 360.0
+offset_bottom = 100.0
+
+[node name="ActionLabel" type="Label" parent="."]
+offset_left = 8.0
+offset_top = 120.0
+offset_right = 360.0
+offset_bottom = 220.0
+
+[node name="StateManager" type="Node" parent="."]
+script = ExtResource("2_manager")
+
+[node name="ActionDemo" type="Node" parent="StateManager"]
+script = ExtResource("3_machine")
+context = {
+&"action_count": 0,
+&"last_action": &"None",
+&"last_source": &"None",
+&"last_target": &"None"
+}
+initial_state_id = &"state_idle"
+graph = SubResource("ActionDemoGraph")
+
+[node name="Idle" type="Node" parent="StateManager/ActionDemo"]
+script = ExtResource("6_action_state")
+stable_id = &"state_idle"
+
+[node name="Active" type="Node" parent="StateManager/ActionDemo"]
+script = ExtResource("6_action_state")
+stable_id = &"state_active"

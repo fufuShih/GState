@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://b5welxfs6l2ip"]
 
-[ext_resource type="Script" uid="uid://byvxch2sdkra1" path="res://examples/simple_2_example.gd" id="1_7y1j5"]
+[ext_resource type="Script" uid="uid://byvxch2sdkra1" path="res://examples/example2/example.gd" id="1_7y1j5"]
 [ext_resource type="Script" uid="uid://b6iwt8dhfr5ua" path="res://addons/gstate/runtime/state_manager.gd" id="2_aixjl"]
 [ext_resource type="Script" uid="uid://i50by6xe6v2e" path="res://addons/gstate/runtime/state_machine.gd" id="3_730l0"]
 [ext_resource type="Script" uid="uid://58h5uoomsyew" path="res://addons/gstate/runtime/state_machine_graph.gd" id="4_x6xjn"]

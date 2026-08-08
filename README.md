@@ -16,6 +16,7 @@ edited through a scope-based graph editor.
 
 - [English documentation](docs/en/README.md)
 - [Traditional Chinese documentation](docs/zh-Hant/README.md)
+- [Examples](examples/README.md)
 
 The addon is located in `addons/gstate/`. Enable **GState** from
 **Project > Project Settings > Plugins** after copying it into a Godot project.
