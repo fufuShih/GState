@@ -1,0 +1,114 @@
+[gd_scene format=3 uid="uid://4ada37asheuw"]
+
+[ext_resource type="Script" uid="uid://36rces6b0n5l" path="res://examples/example5/example.gd" id="1_example"]
+[ext_resource type="Script" uid="uid://b6iwt8dhfr5ua" path="res://addons/gstate/runtime/state_manager.gd" id="2_manager"]
+[ext_resource type="Script" uid="uid://i50by6xe6v2e" path="res://addons/gstate/runtime/state_machine.gd" id="3_machine"]
+[ext_resource type="Script" uid="uid://58h5uoomsyew" path="res://addons/gstate/runtime/state_machine_graph.gd" id="4_graph"]
+[ext_resource type="Script" uid="uid://cmc34giy7r8q4" path="res://addons/gstate/runtime/state_transition.gd" id="5_transition"]
+[ext_resource type="Script" uid="uid://bkmlfi4nsituu" path="res://addons/gstate/runtime/state.gd" id="6_state"]
+[ext_resource type="PackedScene" path="res://addons/gstate/debug/state_debug_panel.tscn" id="7_debug"]
+
+[sub_resource type="Resource" id="Transition_run"]
+script = ExtResource("5_transition")
+id = &"transition_run"
+from_state_id = &"movement_idle"
+to_state_id = &"movement_running"
+event = &"toggle"
+
+[sub_resource type="Resource" id="Transition_idle"]
+script = ExtResource("5_transition")
+id = &"transition_idle"
+from_state_id = &"movement_running"
+to_state_id = &"movement_idle"
+event = &"toggle"
+
+[sub_resource type="Resource" id="MovementGraph"]
+script = ExtResource("4_graph")
+transitions = Array[ExtResource("5_transition")]([SubResource("Transition_run"), SubResource("Transition_idle")])
+editor_positions = {
+&"movement_idle": Vector2(120, 120),
+&"movement_running": Vector2(620, 120)
+}
+
+[sub_resource type="Resource" id="Transition_alert"]
+script = ExtResource("5_transition")
+id = &"transition_alert"
+from_state_id = &"mode_normal"
+to_state_id = &"mode_alert"
+event = &"alert"
+
+[sub_resource type="Resource" id="Transition_normal"]
+script = ExtResource("5_transition")
+id = &"transition_normal"
+from_state_id = &"mode_alert"
+to_state_id = &"mode_normal"
+event = &"alert"
+
+[sub_resource type="Resource" id="ModeGraph"]
+script = ExtResource("4_graph")
+transitions = Array[ExtResource("5_transition")]([SubResource("Transition_alert"), SubResource("Transition_normal")])
+editor_positions = {
+&"mode_alert": Vector2(620, 120),
+&"mode_normal": Vector2(120, 120)
+}
+
+[node name="DebugPanelExample" type="Node2D" unique_id=749503854]
+script = ExtResource("1_example")
+
+[node name="StateManager" type="Node" parent="." unique_id=1131445782]
+script = ExtResource("2_manager")
+
+[node name="Movement" type="Node" parent="StateManager" unique_id=174573363]
+script = ExtResource("3_machine")
+context = {
+&"description": "Space toggles this machine",
+&"speed": 180
+}
+initial_state_id = &"movement_idle"
+graph = SubResource("MovementGraph")
+
+[node name="Idle" type="Node" parent="StateManager/Movement" unique_id=929374971]
+script = ExtResource("6_state")
+stable_id = &"movement_idle"
+
+[node name="Running" type="Node" parent="StateManager/Movement" unique_id=1244029783]
+script = ExtResource("6_state")
+stable_id = &"movement_running"
+
+[node name="Mode" type="Node" parent="StateManager" unique_id=1579098159]
+script = ExtResource("3_machine")
+context = {
+&"description": "A toggles this machine",
+&"level": 1
+}
+initial_state_id = &"mode_normal"
+graph = SubResource("ModeGraph")
+
+[node name="Normal" type="Node" parent="StateManager/Mode" unique_id=1736049709]
+script = ExtResource("6_state")
+stable_id = &"mode_normal"
+
+[node name="Alert" type="Node" parent="StateManager/Mode" unique_id=1658938971]
+script = ExtResource("6_state")
+stable_id = &"mode_alert"
+
+[node name="StateDebugPanel" parent="." unique_id=611811951 node_paths=PackedStringArray("state_manager") instance=ExtResource("7_debug")]
+state_manager = NodePath("../StateManager")
+visible_on_start = true
+allow_send_events = true
+debug_build_only = false
+
+[node name="Instructions" type="Label" parent="." unique_id=1253743311]
+offset_left = 370.0
+offset_top = 24.0
+offset_right = 790.0
+offset_bottom = 180.0
+theme_override_font_sizes/font_size = 18
+text = "GState Runtime Debug Panel
+
+Space / Enter: toggle Movement
+A: toggle Mode
+F8: show or hide the panel
+
+Choose a machine from the panel.
+Try sending a valid or invalid event."

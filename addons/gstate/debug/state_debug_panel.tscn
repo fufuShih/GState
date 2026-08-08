@@ -1,0 +1,135 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://addons/gstate/debug/state_debug_panel.gd" id="1_debug"]
+
+[sub_resource type="Theme" id="Theme_debug_panel"]
+default_font_size = 10
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_debug_panel"]
+bg_color = Color(0.01, 0.01, 0.01, 0.8)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(1, 1, 1, 0.12)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+
+[node name="StateDebugPanel" type="CanvasLayer"]
+layer = 100
+script = ExtResource("1_debug")
+
+[node name="Panel" type="PanelContainer" parent="."]
+unique_name_in_owner = true
+offset_left = 16.0
+offset_top = 16.0
+offset_right = 346.0
+offset_bottom = 406.0
+theme = SubResource("Theme_debug_panel")
+theme_override_styles/panel = SubResource("StyleBox_debug_panel")
+
+[node name="Margin" type="MarginContainer" parent="Panel"]
+theme_override_constants/margin_left = 8
+theme_override_constants/margin_top = 6
+theme_override_constants/margin_right = 8
+theme_override_constants/margin_bottom = 6
+
+[node name="Layout" type="VBoxContainer" parent="Panel/Margin"]
+theme_override_constants/separation = 4
+
+[node name="Header" type="HBoxContainer" parent="Panel/Margin/Layout"]
+unique_name_in_owner = true
+tooltip_text = "Drag to move"
+mouse_default_cursor_shape = 13
+
+[node name="Title" type="Label" parent="Panel/Margin/Layout/Header"]
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 12
+text = "GState"
+mouse_filter = 2
+
+[node name="MinimizeButton" type="Button" parent="Panel/Margin/Layout/Header"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(24, 0)
+focus_mode = 0
+tooltip_text = "Minimize"
+text = "−"
+
+[node name="CloseButton" type="Button" parent="Panel/Margin/Layout/Header"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(24, 0)
+focus_mode = 0
+tooltip_text = "Hide (F8 to show)"
+text = "×"
+
+[node name="Content" type="VBoxContainer" parent="Panel/Margin/Layout"]
+unique_name_in_owner = true
+size_flags_vertical = 3
+theme_override_constants/separation = 4
+
+[node name="MachineRow" type="HBoxContainer" parent="Panel/Margin/Layout/Content"]
+
+[node name="MachineOption" type="OptionButton" parent="Panel/Margin/Layout/Content/MachineRow"]
+unique_name_in_owner = true
+size_flags_horizontal = 3
+focus_mode = 0
+
+[node name="StatusLabel" type="Label" parent="Panel/Margin/Layout/Content/MachineRow"]
+unique_name_in_owner = true
+text = "Stopped"
+
+[node name="ActivePathLabel" type="Label" parent="Panel/Margin/Layout/Content"]
+unique_name_in_owner = true
+text = "Active: None"
+autowrap_mode = 2
+
+[node name="LastTransitionLabel" type="Label" parent="Panel/Margin/Layout/Content"]
+unique_name_in_owner = true
+text = "Last: None"
+autowrap_mode = 2
+
+[node name="ContextSection" type="VBoxContainer" parent="Panel/Margin/Layout/Content"]
+unique_name_in_owner = true
+size_flags_vertical = 3
+
+[node name="ContextTitle" type="Label" parent="Panel/Margin/Layout/Content/ContextSection"]
+text = "Context"
+
+[node name="ContextText" type="RichTextLabel" parent="Panel/Margin/Layout/Content/ContextSection"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 48)
+size_flags_vertical = 3
+scroll_active = true
+selection_enabled = true
+
+[node name="EventLogSection" type="VBoxContainer" parent="Panel/Margin/Layout/Content"]
+unique_name_in_owner = true
+size_flags_vertical = 3
+
+[node name="EventLogTitle" type="Label" parent="Panel/Margin/Layout/Content/EventLogSection"]
+text = "Events"
+
+[node name="EventLogText" type="RichTextLabel" parent="Panel/Margin/Layout/Content/EventLogSection"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 72)
+size_flags_vertical = 3
+scroll_active = true
+scroll_following = true
+selection_enabled = true
+
+[node name="EventRow" type="HBoxContainer" parent="Panel/Margin/Layout/Content"]
+unique_name_in_owner = true
+
+[node name="EventEdit" type="LineEdit" parent="Panel/Margin/Layout/Content/EventRow"]
+unique_name_in_owner = true
+size_flags_horizontal = 3
+focus_mode = 1
+placeholder_text = "Event name"
+clear_button_enabled = true
+
+[node name="SendButton" type="Button" parent="Panel/Margin/Layout/Content/EventRow"]
+unique_name_in_owner = true
+focus_mode = 0
+text = "Send"

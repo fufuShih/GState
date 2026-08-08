@@ -11,6 +11,7 @@ GState 是 Godot 的階層式、事件驅動狀態機插件。狀態階層由 Sc
 - [架構](architecture.md)
 - [Nested State](nested-states.md)
 - [Runtime API](runtime-api.md)
+- [Runtime Debug Panel](debug-panel.md)
 
 ## 目前支援
 
@@ -25,6 +26,7 @@ GState 是 Godot 的階層式、事件驅動狀態機插件。狀態階層由 Sc
 - 每條 Transition 可設定一個選填 Action
 - 同一台 Machine 內共用的 Context Dictionary
 - `enter()`、`exit()`、`update()` 與 `physics_update()`
+- 選用的遊戲內 Runtime Debug Panel
 - Graph Editor 與 Undo/Redo
 
 ## 尚未支援

@@ -12,6 +12,7 @@ saved with the scene automatically.
 - [Architecture](architecture.md)
 - [Nested states](nested-states.md)
 - [Runtime API](runtime-api.md)
+- [Runtime Debug Panel](debug-panel.md)
 
 ## Currently supported
 
@@ -26,6 +27,7 @@ saved with the scene automatically.
 - One optional action per transition
 - Dictionary context shared by states in one machine
 - `enter()`, `exit()`, `update()`, and `physics_update()`
+- Optional in-game Runtime Debug Panel
 - Graph Editor operations with Undo/Redo
 
 ## Not yet supported

@@ -109,6 +109,19 @@ Transition order is exit, optional action, then enter.
 `PackedStringArray`s. `start()` validates the complete state tree and safely
 refuses to run when errors are present.
 
+## Runtime Debug Panel
+
+Instantiate `res://addons/gstate/debug/state_debug_panel.tscn` and assign a
+`StateManager` in the Inspector to inspect machines in a running game. The
+optional panel shows the active path, last transition, context, and recent
+accepted or rejected events. Press `F8` to show or hide it.
+Use the minus button to collapse it to one title row, or drag the header to
+move it. Regular controls do not keep keyboard focus.
+
+Event sending is disabled by default. Enable `allow_send_events` when manual
+event testing is useful. `debug_build_only` removes the panel from non-debug
+exports by default.
+
 ## Graph Editor
 
 Enable the `GState` plugin, then select a `StateManager`, `StateMachine`, or
